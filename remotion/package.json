@@ -1,0 +1,26 @@
+{
+  "name": "real-estate-reels",
+  "version": "0.1.0",
+  "scripts": {
+    "start": "remotion preview",
+    "render": "remotion render"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.421",
+    "@remotion/google-fonts": "4.0.421",
+    "@remotion/renderer": "^4.0.421",
+    "@remotion/zod-types": "^4.0.421",
+    "@types/react": "^19.2.13",
+    "@types/react-dom": "^19.2.3",
+    "autoprefixer": "10.4.24",
+    "clsx": "2.1.1",
+    "lucide-react": "0.563.0",
+    "postcss": "8.5.6",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "remotion": "^4.0.421",
+    "tailwind-merge": "3.4.0",
+    "tailwindcss": "4.1.18",
+    "zod": "^3.22.3"
+  }
+}

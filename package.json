@@ -1,0 +1,21 @@
+{
+  "name": "real-estate-reels-web",
+  "version": "0.1.0",
+  "description": "Local web UI for rendering Real Estate Reels via Remotion",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "concurrently \"node server.js\" \"npm run dev --prefix client\"",
+    "setup": "npm install --prefix client && npm run build --prefix client",
+    "build": "npm run build --prefix client"
+  },
+  "dependencies": {
+    "concurrently": "^8.2.2",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.1",
+    "multer": "^2.1.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

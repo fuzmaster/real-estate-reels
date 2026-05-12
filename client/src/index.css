@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-neutral-950 text-neutral-100 antialiased;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #404040 transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: #404040;
+    border-radius: 3px;
+  }
+}
