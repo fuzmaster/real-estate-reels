@@ -89,7 +89,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="rer-app-ui min-h-screen flex flex-col">
       {/* Top nav */}
       <header className="border-b border-neutral-800 bg-neutral-900/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
@@ -98,7 +98,7 @@ export default function App() {
             <span className="text-lg font-bold tracking-tight text-neutral-400">REELS</span>
             <span
               title={serverOk === null ? 'Checking server…' : serverOk ? 'Server online' : 'Server offline'}
-              className={`w-2 h-2 rounded-full ml-1 flex-shrink-0 transition-colors
+              className={`w-2 h-2 rounded-sm ml-1 flex-shrink-0 transition-colors
                 ${serverOk === null ? 'bg-neutral-600'
                   : serverOk ? 'bg-emerald-400'
                   : 'bg-red-500 animate-pulse'}`}
@@ -106,24 +106,24 @@ export default function App() {
           </div>
           <nav className="flex gap-1">
             <NavBtn active={view === 'form'} onClick={() => setView('form')}>
-              New Listing
+              1. Build
             </NavBtn>
             <NavBtn active={view === 'queue'} onClick={() => setView('queue')}>
               Queue
               {queue.length > 0 && (
-                <span className="ml-1.5 bg-yellow-400 text-black text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none">
+                <span className="ml-1.5 bg-yellow-400 text-black text-[10px] font-bold rounded-sm px-1.5 py-0.5 leading-none">
                   {queue.length}
                 </span>
               )}
             </NavBtn>
             <NavBtn active={view === 'console'} onClick={() => setView('console')}>
-              Render Videos
+              3. Render
               {jobs.length > 0 && (
-                <span className="ml-1.5 w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+                <span className="ml-1.5 w-1.5 h-1.5 rounded-sm bg-emerald-400 inline-block" />
               )}
             </NavBtn>
             <NavBtn active={view === 'outputs'} onClick={() => setView('outputs')}>
-              Output Gallery
+              4. Outputs
             </NavBtn>
             <NavBtn active={view === 'help'} onClick={() => setView('help')}>
               Help
@@ -143,7 +143,7 @@ export default function App() {
       {/* Main content */}
       <main className="flex-1 max-w-4xl mx-auto w-full px-6 py-8">
         {serverOk === false && (
-          <div className="mb-6 bg-yellow-950/60 border border-yellow-800/60 rounded-xl px-5 py-4 flex gap-4 items-start">
+          <div className="mb-6 bg-yellow-950/60 border border-yellow-800/60 rounded-none px-5 py-4 flex gap-4 items-start">
             <span className="text-yellow-400 text-xl flex-shrink-0 mt-0.5">⚠</span>
             <div>
               <p className="text-yellow-200 font-semibold text-sm mb-1">Local server not running</p>
@@ -151,7 +151,7 @@ export default function App() {
                 Rendering requires the local Express server. Open a terminal in the project folder and run{' '}
                 <code className="bg-yellow-900/60 px-1.5 py-0.5 rounded font-mono">node server.js</code>,
                 then set <code className="bg-yellow-900/60 px-1.5 py-0.5 rounded font-mono">VITE_API_URL</code> in
-                Vercel to your machine's IP. The form is still editable for reference.
+                Vercel to your hosted API URL from Render or Railway. The form is still editable for reference.
               </p>
             </div>
           </div>
@@ -206,3 +206,4 @@ function NavBtn({
     </button>
   );
 }
+

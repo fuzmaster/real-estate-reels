@@ -1,38 +1,43 @@
 @echo off
-title Genera Reels Web
+title Real Estate Reels Web
 cd /d "%~dp0"
 
-:: Install server dependencies if needed
 if not exist "node_modules" (
     echo Installing server dependencies...
     call npm install
-    if errorlevel 1 (
-        echo.
-        echo Setup failed. Make sure Node.js is installed: https://nodejs.org
-        pause
-        exit /b 1
-    )
+    if errorlevel 1 goto fail
 )
 
-:: Install Remotion dependencies if needed
+if not exist "client\node_modules" (
+    echo Installing client dependencies...
+    call npm install --prefix client
+    if errorlevel 1 goto fail
+)
+
+if not exist "client\dist" (
+    echo Building client app...
+    call npm run build --prefix client
+    if errorlevel 1 goto fail
+)
+
 if not exist "remotion\node_modules" (
-    echo Installing Remotion dependencies ^(this takes a minute the first time^)...
-    cd /d "%~dp0remotion"
-    call npm install
-    if errorlevel 1 (
-        echo.
-        echo Remotion setup failed.
-        pause
-        exit /b 1
-    )
-    cd /d "%~dp0"
+    echo Installing Remotion dependencies. This can take a few minutes...
+    call npm install --prefix remotion
+    if errorlevel 1 goto fail
 )
 
 echo.
-echo  Starting Genera Reels Web...
+echo  Starting Real Estate Reels Web...
 echo  Open http://localhost:3000 in your browser.
 echo.
 echo  Press Ctrl+C to stop the server.
 echo.
 npm start
 pause
+exit /b 0
+
+:fail
+echo.
+echo Setup failed. Make sure Node.js is installed, then try again.
+pause
+exit /b 1

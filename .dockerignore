@@ -1,0 +1,16 @@
+.git
+.gitignore
+node_modules
+client/node_modules
+remotion/node_modules
+client/dist
+remotion/out
+remotion/public/Projects
+.env
+.env.local
+.DS_Store
+*.log
+npm-debug.log*
+.vercel
+.cache
+coverage

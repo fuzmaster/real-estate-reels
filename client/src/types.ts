@@ -5,16 +5,24 @@ import type { PhotoFraming } from './utils/photoFraming';
 export type ReelTemplate = 'just-listed' | 'open-house' | 'just-sold';
 
 export type PhotoTransitionPreset =
-  | 'smart'
-  | 'fade'
+  | 'smart-mix'
+  | 'soft-fade'
   | 'slide-left'
   | 'slide-up'
   | 'zoom-pop'
-  | 'whip'
-  | 'flash'
+  | 'whip-pan'
+  | 'flash-cut'
   | 'none';
 
-export type PhotoTransition = PhotoTransitionPreset;
+export type PhotoTransition =
+  | 'smart-mix'
+  | 'soft-fade'
+  | 'slide-left'
+  | 'slide-up'
+  | 'zoom-pop'
+  | 'whip-pan'
+  | 'flash-cut'
+  | 'none';
 
 export type VideoStyle = 'social-punchy' | 'luxury-cinematic' | 'brokerage-clean';
 export type PacingPreset = 'fast' | 'balanced' | 'cinematic';
@@ -77,6 +85,8 @@ export interface CampaignFormData {
 
   // Output config
   duration: number;       // seconds per reel
+  useSmartDuration?: boolean; // true when the app auto-calculates reel length from photo count
+  recommendedDuration?: number; // seconds suggested by Smart Duration
   videoStyle: VideoStyle;
   pacing: PacingPreset;
   musicMood: MusicMood;

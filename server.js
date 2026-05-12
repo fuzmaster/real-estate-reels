@@ -17,17 +17,51 @@ const PORT = process.env.PORT || 3000;
 
 // Default to the bundled remotion/ subfolder — works out of the box with no .env
 const BUNDLED_REMOTION = path.join(__dirname, 'remotion');
-const BUNDLED_ASSETS   = path.join(__dirname, 'remotion', 'public');
+const BUNDLED_ASSETS = path.join(__dirname, 'remotion', 'public');
+const DEFAULT_DATA_ROOT = process.env.DATA_ROOT || process.env.PERSISTENT_ROOT || path.join(__dirname, '.data');
 
-let ASSETS_ROOT       = process.env.ASSETS_ROOT       || (fs.existsSync(BUNDLED_ASSETS)   ? BUNDLED_ASSETS   : '');
-let REMOTION_PROJECT  = process.env.REMOTION_PROJECT  || (fs.existsSync(BUNDLED_REMOTION) ? BUNDLED_REMOTION : '');
+let ASSETS_ROOT = process.env.ASSETS_ROOT || (process.env.NODE_ENV === 'production' ? path.join(DEFAULT_DATA_ROOT, 'assets') : BUNDLED_ASSETS);
+let REMOTION_PROJECT = process.env.REMOTION_PROJECT || BUNDLED_REMOTION;
+let OUTPUT_ROOT = process.env.OUTPUT_ROOT || (process.env.NODE_ENV === 'production' ? path.join(DEFAULT_DATA_ROOT, 'outputs') : path.join(REMOTION_PROJECT, 'out'));
 
-app.use(express.json());
+app.set('trust proxy', 1);
+
+const allowedOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  const isLocalhost = origin && /^https?:\/\/localhost(:\d+)?$/.test(origin);
+  const isAllowed = !origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin) || isLocalhost;
+
+  if (isAllowed && origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
+app.use(express.json({ limit: '25mb' }));
 
 function validateConfig() {
-  if (!ASSETS_ROOT || !fs.existsSync(ASSETS_ROOT)) return false;
-  if (!REMOTION_PROJECT || !fs.existsSync(REMOTION_PROJECT)) return false;
-  return true;
+  try {
+    if (!REMOTION_PROJECT || !fs.existsSync(REMOTION_PROJECT)) return false;
+    fs.mkdirSync(ASSETS_ROOT, { recursive: true });
+    fs.mkdirSync(path.join(ASSETS_ROOT, 'Projects'), { recursive: true });
+    fs.mkdirSync(OUTPUT_ROOT, { recursive: true });
+    fs.mkdirSync(path.join(REMOTION_PROJECT, 'public', 'Projects'), { recursive: true });
+    return true;
+  } catch (e) {
+    console.warn(`Config validation failed: ${e.message}`);
+    return false;
+  }
 }
 // Auto-create the public/Projects folder when using the bundled remotion path
 if (ASSETS_ROOT && ASSETS_ROOT === BUNDLED_ASSETS && !fs.existsSync(ASSETS_ROOT)) {
@@ -143,8 +177,18 @@ const HEADSHOT_DIR = 'Headshot';
 const LOGO_DIR     = 'Logo';
 const MUSIC_DIR    = 'Music';
 
+function safeSegment(value, fallback = 'listing') {
+  const cleaned = String(value || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9 _.-]+/g, '_')
+    .replace(/\s+/g, ' ')
+    .slice(0, 90);
+  const noDots = cleaned.replace(/\.\./g, '').replace(/^[.\s]+|[.\s]+$/g, '');
+  return noDots || fallback;
+}
+
 function listingDir(name) {
-  return path.join(ASSETS_ROOT, 'Projects', name);
+  return path.join(ASSETS_ROOT, 'Projects', safeSegment(name));
 }
 
 function readFirstImage(dir) {
@@ -157,7 +201,7 @@ function readFirstImage(dir) {
 app.post('/api/projects', requireConfig, (req, res) => {
   const { name } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: 'Name required' });
-  const safeName = name.trim();
+  const safeName = safeSegment(name.trim());
   const dir = listingDir(safeName);
   if (fs.existsSync(dir)) return res.status(409).json({ error: 'Project already exists' });
   try {
@@ -220,11 +264,59 @@ app.get('/api/projects/:name/listing-assets', requireConfig, (req, res) => {
 app.get('/api/projects/:name/files/*', requireConfig, (req, res) => {
   const rel = req.params[0];
   if (!rel || rel.includes('..')) return res.status(400).send('Bad path');
-  const full = path.join(listingDir(req.params.name), rel);
+  const base = listingDir(req.params.name);
+  const full = path.resolve(base, rel);
+  if (!full.startsWith(path.resolve(base))) return res.status(400).send('Bad path');
   if (!fs.existsSync(full)) return res.status(404).send('Not found');
   res.sendFile(full);
 });
 
+// ── UPLOAD MANY LISTING PHOTOS (batch — lets users select/drop multiple) ───
+app.post('/api/projects/:name/photos/batch', requireConfig, upload.any(), (req, res) => {
+  const files = Array.isArray(req.files) ? req.files : [];
+  if (files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
+
+  const dir = path.join(listingDir(req.params.name), PHOTOS_DIR);
+  fs.mkdirSync(dir, { recursive: true });
+
+  const saved = [];
+  try {
+    for (const file of files) {
+      if (!file || !/image/i.test(file.mimetype || '')) {
+        if (file?.path && fs.existsSync(file.path)) fs.unlinkSync(file.path);
+        continue;
+      }
+
+      const original = path.basename(file.originalname || 'photo.jpg').replace(/[^a-zA-Z0-9._-]+/g, '_');
+      const ext = path.extname(original).toLowerCase() || '.jpg';
+      const stem = path.basename(original, ext) || 'photo';
+      let target = `${stem}${ext}`;
+      let n = 1;
+
+      while (fs.existsSync(path.join(dir, target))) {
+        target = `${stem}-${n}${ext}`;
+        n++;
+      }
+
+      fs.copyFileSync(file.path, path.join(dir, target));
+      fs.unlinkSync(file.path);
+      saved.push(`${PHOTOS_DIR}/${target}`);
+    }
+
+    if (saved.length === 0) {
+      return res.status(400).json({ error: 'No image files were uploaded' });
+    }
+
+    res.json({ files: saved });
+  } catch (e) {
+    for (const file of files) {
+      try {
+        if (file?.path && fs.existsSync(file.path)) fs.unlinkSync(file.path);
+      } catch (_) {}
+    }
+    res.status(500).json({ error: e.message });
+  }
+});
 // ── UPLOAD LISTING PHOTO (additive — keeps existing photos) ───
 app.post('/api/projects/:name/photos', requireConfig, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -303,7 +395,7 @@ app.post('/api/projects/:name/music', requireConfig, upload.single('file'), (req
 
 // ── LIST OUTPUTS ──────────────────────────────────────────────
 app.get('/api/outputs', requireConfig, (req, res) => {
-  const outDir = path.join(REMOTION_PROJECT, 'out');
+  const outDir = OUTPUT_ROOT;
   try {
     if (!fs.existsSync(outDir)) return res.json([]);
     const campaigns = fs.readdirSync(outDir, { withFileTypes: true })
@@ -329,7 +421,7 @@ app.get('/api/outputs', requireConfig, (req, res) => {
 
 // ── SERVE OUTPUT VIDEO FILES ──────────────────────────────────
 app.get('/api/outputs/:slug/:file', requireConfig, (req, res) => {
-  const filePath = path.join(REMOTION_PROJECT, 'out', req.params.slug, req.params.file);
+  const filePath = path.join(OUTPUT_ROOT, safeSegment(req.params.slug), path.basename(req.params.file));
   if (!fs.existsSync(filePath)) return res.status(404).send('Not found');
   res.sendFile(filePath);
 });
@@ -340,6 +432,8 @@ app.post('/api/render', requireConfig, (req, res) => {
   const jobId = Date.now().toString();
 
   const emitter = new EventEmitter();
+  // V6E_NOOP_ERROR_LISTENER: prevents unhandled EventEmitter "error" crashes.
+  emitter.on('error', () => {});
   emitter.setMaxListeners(20);
   jobEmitters.set(jobId, emitter);
   jobs.set(jobId, {
@@ -465,7 +559,7 @@ app.delete('/api/render/:jobId', requireConfig, (req, res) => {
 
 // ── DELETE OUTPUT FILE ────────────────────────────────────────
 app.delete('/api/outputs/:slug/:file', requireConfig, (req, res) => {
-  const filePath = path.join(REMOTION_PROJECT, 'out', req.params.slug, req.params.file);
+  const filePath = path.join(OUTPUT_ROOT, safeSegment(req.params.slug), path.basename(req.params.file));
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
   try {
     fs.unlinkSync(filePath);
@@ -490,10 +584,11 @@ async function runRender(jobId, campaign, emitter) {
 
   const CONFIG_FILE = path.join(REMOTION_PROJECT, 'src', 'campaign.config.ts');
   const ENTRY_POINT = 'src/index.tsx';
-  const OUTPUT_BASE = path.join(REMOTION_PROJECT, 'out');
+  const OUTPUT_BASE = OUTPUT_ROOT;
 
   log(`━━━ Starting render: ${campaign.folder} ━━━`);
 
+  campaign.folder = safeSegment(campaign.folder);
   const srcFolder = path.join(ASSETS_ROOT, 'Projects', campaign.folder);
   const destFolder = path.join(REMOTION_PROJECT, 'public', 'Projects', campaign.folder);
 
@@ -529,7 +624,7 @@ async function runRender(jobId, campaign, emitter) {
   writeConfig(campaign, photos, CONFIG_FILE);
   log(`Wrote campaign.config.ts`);
 
-  const slug = campaign.folder.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const slug = safeSegment(campaign.folder).replace(/[^a-zA-Z0-9_-]/g, '_');
   const outDir = path.join(OUTPUT_BASE, slug);
   fs.mkdirSync(outDir, { recursive: true });
 
@@ -585,11 +680,74 @@ function tsString(value) {
   return JSON.stringify(value == null ? '' : String(value));
 }
 
+
+function normalizePhotoTransition(value) {
+  const raw = String(value || 'smart-mix').trim().toLowerCase();
+  const aliases = {
+    'smart': 'smart-mix',
+    'smart-mix': 'smart-mix',
+    'fade': 'soft-fade',
+    'soft-fade': 'soft-fade',
+    'slide': 'slide-left',
+    'slide-in': 'slide-left',
+    'slide-left': 'slide-left',
+    'slide-up': 'slide-up',
+    'zoom': 'zoom-pop',
+    'zoom-pop': 'zoom-pop',
+    'whip': 'whip-pan',
+    'whip-pan': 'whip-pan',
+    'flash': 'flash-cut',
+    'flash-cut': 'flash-cut',
+    'none': 'none',
+  };
+  return aliases[raw] || 'smart-mix';
+}
+
 function writeConfig(campaign, photos, configFile) {
   const photosTs = photos.map(p => `  ${JSON.stringify(p)},`).join('\n');
-  const duration = Number(campaign.duration) > 0 ? Math.round(Number(campaign.duration)) : 18;
+  const duration = Number(campaign.duration) > 0 ? Math.round(Number(campaign.duration)) : 15;
+const cleanPhotoSettings = Array.isArray(campaign.photoSettings)
+    ? campaign.photoSettings
+        .filter(s => s && s.path)
+        .map(s => ({
+          path: String(s.path),
+          mode: s.mode === 'fill' ? 'fill' : 'show-whole-room',
+          focusX: Number.isFinite(Number(s.focusX)) ? Math.min(100, Math.max(0, Number(s.focusX))) : 50,
+          focusY: Number.isFinite(Number(s.focusY)) ? Math.min(100, Math.max(0, Number(s.focusY))) : 50,
+        }))
+    : photos.map((p, i) => ({
+        path: p,
+        mode: i === 0 ? 'fill' : 'show-whole-room',
+        focusX: 50,
+        focusY: 50,
+      }));
 
-  const config = `// AUTO-GENERATED by real-estate-reels-web — do not hand-edit.
+  const safeStyle = ['social', 'luxury', 'brokerage'].includes(campaign.videoStyle) ? campaign.videoStyle : 'social';
+  const safePacing = ['fast', 'balanced', 'cinematic'].includes(campaign.pacing) ? campaign.pacing : 'fast';
+  // V6G_TRANSITION_NORMALIZE_START
+  const rawPhotoTransitionV6G = String(campaign.photoTransition || 'smart-mix').trim().toLowerCase();
+  const photoTransitionAliasesV6G = {
+    'smart': 'smart-mix',
+    'smart-mix': 'smart-mix',
+    'fade': 'soft-fade',
+    'soft-fade': 'soft-fade',
+    'slide': 'slide-left',
+    'slide-in': 'slide-left',
+    'slide-left': 'slide-left',
+    'slide-up': 'slide-up',
+    'zoom': 'zoom-pop',
+    'zoom-pop': 'zoom-pop',
+    'whip': 'whip-pan',
+    'whip-pan': 'whip-pan',
+    'flash': 'flash-cut',
+    'flash-cut': 'flash-cut',
+    'none': 'none',
+  };
+  const safeTransition = photoTransitionAliasesV6G[rawPhotoTransitionV6G] || 'smart-mix';
+  // V6G_TRANSITION_NORMALIZE_END
+
+
+const config = `// AUTO-GENERATED by real-estate-reels-web — do not hand-edit.
 // Real estate listing config — consumed by Root.tsx.
 
 export const PROJECT_FOLDER = ${tsString(`Projects/${campaign.folder}`)};
@@ -597,6 +755,13 @@ export const PROJECT_FOLDER = ${tsString(`Projects/${campaign.folder}`)};
 export const LISTING_PHOTOS: string[] = [
 ${photosTs}
 ];
+
+export const PHOTO_SETTINGS = ${JSON.stringify(cleanPhotoSettings, null, 2)} as {
+  path: string;
+  mode: 'fill' | 'show-whole-room';
+  focusX: number;
+  focusY: number;
+}[];
 
 export const AGENT_HEADSHOT_FILE = ${tsString(campaign.headshot || '')};
 export const BROKERAGE_LOGO_FILE = ${tsString(campaign.logo || '')};
@@ -614,7 +779,7 @@ export const AGENT_NAME       = ${tsString(campaign.agentName)};
 export const AGENT_PHONE      = ${tsString(campaign.agentPhone)};
 export const AGENT_EMAIL      = ${tsString(campaign.agentEmail)};
 export const BROKERAGE_NAME   = ${tsString(campaign.brokerageName)};
-export const CTA_TEXT         = ${tsString(campaign.ctaText || 'Schedule a Showing')};
+export const CTA_TEXT         = ${tsString(campaign.ctaText || 'DM "TOUR" TO SEE IT')};
 
 export const OPEN_HOUSE_DATE  = ${tsString(campaign.openHouseDate)};
 export const OPEN_HOUSE_TIME  = ${tsString(campaign.openHouseTime)};
@@ -623,6 +788,15 @@ export const NEIGHBORHOOD     = ${tsString(campaign.neighborhood)};
 export const MLS_LINK         = ${tsString(campaign.mlsLink)};
 
 export const CLIP_DURATION_SECONDS = ${duration};
+export const PHOTO_TRANSITION = ${tsString(safeTransition)};
+
+
+export const PACING = ${JSON.stringify(safePacing)} as 'fast' | 'balanced' | 'cinematic';
+export const AUTO_ENHANCE = ${campaign.autoEnhance !== false};
+export const SMART_SAFE_ZONES = ${campaign.smartSafeZones !== false};
+export const PERSISTENT_BRANDING = ${campaign.persistentBranding !== false};
+export const PROGRESS_BAR = ${campaign.progressBar !== false};
+
 `;
 
   fs.writeFileSync(configFile, config, 'utf8');
@@ -824,11 +998,27 @@ app.listen(PORT, () => {
     console.log(`    Assets:   ${ASSETS_ROOT}`);
     console.log(`    Remotion: ${REMOTION_PROJECT}\n`);
   }
-
-  setTimeout(() => {
-    const { exec } = require('child_process');
-    if (process.platform === 'win32') exec(`start "" "${url}"`);
-    else if (process.platform === 'darwin') exec(`open "${url}"`);
-    else exec(`xdg-open "${url}"`);
-  }, 800);
+  if (!process.env.DISABLE_AUTO_OPEN && !process.env.RENDER && !process.env.RAILWAY_ENVIRONMENT) {
+    setTimeout(() => {
+      const { exec } = require('child_process');
+      if (process.platform === 'win32') exec(`start "" "${url}"`);
+      else if (process.platform === 'darwin') exec(`open "${url}"`);
+      else exec(`xdg-open "${url}"`);
+    }, 800);
+  }
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

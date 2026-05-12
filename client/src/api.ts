@@ -1,6 +1,6 @@
 import type { CampaignFormData, ListingAssets, OutputCampaign } from './types';
 
-export const API_BASE: string = import.meta.env.VITE_API_URL ?? '';
+export const API_BASE: string = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
 
 export async function getProjects(): Promise<string[]> {
   const res = await fetch(`${API_BASE}/api/projects`);
@@ -27,7 +27,8 @@ export async function getListingAssets(name: string): Promise<ListingAssets> {
 }
 
 export function projectFileUrl(projectName: string, relPath: string): string {
-  return `${API_BASE}/api/projects/${encodeURIComponent(projectName)}/files/${encodeURIComponent(relPath)}`;
+  const safeRelPath = relPath.split('/').map(part => encodeURIComponent(part)).join('/');
+  return `${API_BASE}/api/projects/${encodeURIComponent(projectName)}/files/${safeRelPath}`;
 }
 
 export async function uploadListingPhoto(projectName: string, file: File): Promise<string> {
@@ -41,6 +42,26 @@ export async function uploadListingPhoto(projectName: string, file: File): Promi
   return (await res.json()).file;
 }
 
+export async function uploadListingPhotos(projectName: string, files: FileList | File[]): Promise<string[]> {
+  const selected = Array.from(files).filter(file => /image/i.test(file.type));
+  if (selected.length === 0) throw new Error('Choose at least one image file');
+
+  const fd = new FormData();
+  selected.forEach(file => fd.append('files', file));
+
+  const res = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(projectName)}/photos/batch`, {
+    method: 'POST',
+    body: fd,
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to upload listing photos');
+  }
+
+  const data = await res.json();
+  return data.files || [];
+}
 export async function uploadHeadshot(projectName: string, file: File): Promise<string> {
   const fd = new FormData();
   fd.append('file', file);
@@ -109,3 +130,5 @@ export async function getHealth(): Promise<void> {
   const res = await fetch(`${API_BASE}/api/health`);
   if (!res.ok) throw new Error('Server unhealthy');
 }
+
+

@@ -20,3 +20,82 @@
     border-radius: 3px;
   }
 }
+
+
+/* V8_PROFESSIONAL_HARD_EDGE_UI
+   Sharper, brokerage-style interface. This intentionally reduces the soft SaaS look.
+   It affects the app UI only, not the rendered MP4 output.
+*/
+.rer-app-ui {
+  --rer-panel: #111111;
+  --rer-panel-2: #151515;
+  --rer-border: #2a2a2a;
+  --rer-border-strong: #525252;
+  letter-spacing: 0.005em;
+}
+
+.rer-app-ui .rounded,
+.rer-app-ui .rounded-sm,
+.rer-app-ui .rounded-md,
+.rer-app-ui .rounded-lg,
+.rer-app-ui .rounded-xl,
+.rer-app-ui .rounded-2xl,
+.rer-app-ui .rounded-3xl,
+.rer-app-ui .rounded-full {
+  border-radius: 2px !important;
+}
+
+.rer-app-ui header {
+  border-bottom: 1px solid var(--rer-border-strong);
+  background: rgba(8, 8, 8, 0.96);
+}
+
+.rer-app-ui header nav {
+  border: 1px solid var(--rer-border);
+  background: #0b0b0b;
+  padding: 2px;
+  gap: 0;
+}
+
+.rer-app-ui header nav button {
+  border-radius: 0 !important;
+  border-right: 1px solid var(--rer-border);
+  padding-left: 14px;
+  padding-right: 14px;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.rer-app-ui header nav button:last-child {
+  border-right: 0;
+}
+
+.rer-app-ui input,
+.rer-app-ui select,
+.rer-app-ui textarea,
+.rer-app-ui button {
+  border-radius: 2px !important;
+}
+
+.rer-app-ui .bg-neutral-900 {
+  background-color: var(--rer-panel);
+}
+
+.rer-app-ui .bg-neutral-800 {
+  background-color: var(--rer-panel-2);
+}
+
+.rer-app-ui .border-neutral-800,
+.rer-app-ui .border-neutral-700 {
+  border-color: var(--rer-border);
+}
+
+.rer-app-ui h1,
+.rer-app-ui h2 {
+  letter-spacing: 0.02em;
+}
+
+.rer-app-ui h2 {
+  color: #d4d4d4;
+}

@@ -27,3 +27,25 @@ Thumbs.db
 
 # Tooling state
 .claude/
+
+# Local backup and patch artifacts
+*.bak*
+*.backup-*
+.v5-backup-*/
+.v6-transition-backup-*/
+.v6c-transition-backup-*/
+.v6d-transition-backup-*/
+.v6e-render-fix-backup-*/
+.v6f-final-transition-fix-backup-*/
+.v6g-dedupe-transition-fix-backup-*/
+.v7-smart-duration-backup-*/
+.v8-smart-framing-ui-backup-*/
+.v8b-smart-framing-build-fix-backup-*/
+_archive_patch_junk_*/
+.cleanup-archive/
+
+# Generated media/output
+remotion/out/
+remotion/public/Projects/
+/*.mp3
+/*.mp4

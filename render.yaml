@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: real-estate-reels-api
+    runtime: docker
+    plan: starter
+    branch: main
+    healthCheckPath: /api/health
+    disk:
+      name: real-estate-reels-data
+      mountPath: /var/data
+      sizeGB: 10
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATA_ROOT
+        value: /var/data
+      - key: ASSETS_ROOT
+        value: /var/data/assets
+      - key: OUTPUT_ROOT
+        value: /var/data/outputs
+      - key: REMOTION_PROJECT
+        value: /app/remotion
+      - key: DISABLE_AUTO_OPEN
+        value: "1"
+      - key: CORS_ORIGIN
+        value: https://real-estate-reels.vercel.app

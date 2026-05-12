@@ -12,7 +12,7 @@ export default function Landing() {
             <a href="#pricing" className="text-sm text-neutral-400 hover:text-white transition-colors hidden sm:block">Pricing</a>
             <a
               href="/app"
-              className="bg-[#D4AF37] hover:bg-yellow-400 text-black text-sm font-bold px-4 py-1.5 rounded-full transition-colors"
+              className="bg-[#D4AF37] hover:bg-yellow-400 text-black text-sm font-bold px-4 py-1.5 rounded-sm transition-colors"
             >
               Launch App
             </a>
@@ -22,7 +22,7 @@ export default function Landing() {
 
       {/* Hero */}
       <section className="max-w-5xl mx-auto px-6 pt-24 pb-20 text-center">
-        <div className="inline-block bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] text-xs font-bold px-3 py-1 rounded-full mb-6 uppercase tracking-widest">
+        <div className="inline-block bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] text-xs font-bold px-3 py-1 rounded-sm mb-6 uppercase tracking-widest">
           Built for Real Estate Agents
         </div>
         <h1 className="text-5xl sm:text-6xl font-black leading-[1.05] mb-6 tracking-tight">
@@ -37,7 +37,7 @@ export default function Landing() {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <a
             href="/app"
-            className="bg-[#D4AF37] hover:bg-yellow-400 text-black font-bold px-8 py-3.5 rounded-full text-base transition-colors w-full sm:w-auto text-center"
+            className="bg-[#D4AF37] hover:bg-yellow-400 text-black font-bold px-8 py-3.5 rounded-sm text-base transition-colors w-full sm:w-auto text-center"
           >
             Create Your First Reel — Free
           </a>
@@ -136,7 +136,7 @@ export default function Landing() {
               <div key={label} className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden flex flex-col">
                 <div className="relative">
                   <img src={src} alt={`${label} real estate reel template`} className="w-full object-cover aspect-[9/16]" />
-                  <span className={`absolute top-3 left-3 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider ${badge}`}>
+                  <span className={`absolute top-3 left-3 text-xs font-black px-3 py-1 rounded-sm uppercase tracking-wider ${badge}`}>
                     {label}
                   </span>
                 </div>
@@ -167,7 +167,7 @@ export default function Landing() {
             ['1080×1920 MP4 — Instagram, TikTok, YouTube Shorts ready', true],
             ['Renders locally — your media never leaves your machine', true],
           ].map(([label]) => (
-            <div key={label as string} className="flex items-start gap-3 bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-3">
+            <div key={label as string} className="flex items-start gap-3 bg-neutral-900 border border-neutral-800 rounded-none px-4 py-3">
               <span className="text-[#D4AF37] flex-shrink-0 mt-0.5">✓</span>
               <span className="text-sm text-neutral-300">{label as string}</span>
             </div>
@@ -199,14 +199,14 @@ export default function Landing() {
                   </li>
                 ))}
               </ul>
-              <a href="/app" className="block text-center bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-3 rounded-xl transition-colors text-sm">
+              <a href="/app" className="block text-center bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-3 rounded-none transition-colors text-sm">
                 Start Free
               </a>
             </div>
 
             {/* Pro */}
             <div className="bg-neutral-900 border border-[#D4AF37]/40 rounded-2xl p-8 flex flex-col relative">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#D4AF37] text-black text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#D4AF37] text-black text-xs font-black px-3 py-1 rounded-sm uppercase tracking-wider">
                 Most Popular
               </div>
               <div className="text-[#D4AF37] text-sm font-bold uppercase tracking-widest mb-4">Pro</div>
@@ -230,7 +230,7 @@ export default function Landing() {
                   </li>
                 ))}
               </ul>
-              <a href="/app" className="block text-center bg-[#D4AF37] hover:bg-yellow-400 text-black font-bold py-3 rounded-xl transition-colors text-sm">
+              <a href="/app" className="block text-center bg-[#D4AF37] hover:bg-yellow-400 text-black font-bold py-3 rounded-none transition-colors text-sm">
                 Start Pro — $29/mo
               </a>
             </div>
@@ -242,7 +242,7 @@ export default function Landing() {
               <div className="text-white font-bold text-sm mb-1">Brokerage / Team — $99/mo</div>
               <div className="text-neutral-500 text-xs">Multiple agents, shared brand kit, white-label, bulk render. Contact us for a demo.</div>
             </div>
-            <a href="mailto:hello@realestatereels.app" className="flex-shrink-0 text-xs border border-neutral-700 hover:border-neutral-500 text-neutral-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
+            <a href="mailto:hello@realestatereels.app" className="flex-shrink-0 text-xs border border-neutral-700 hover:border-neutral-500 text-neutral-400 hover:text-white px-4 py-2 rounded-none transition-colors">
               Contact
             </a>
           </div>
@@ -295,7 +295,7 @@ export default function Landing() {
         </p>
         <a
           href="/app"
-          className="inline-block bg-[#D4AF37] hover:bg-yellow-400 text-black font-bold px-10 py-4 rounded-full text-base transition-colors"
+          className="inline-block bg-[#D4AF37] hover:bg-yellow-400 text-black font-bold px-10 py-4 rounded-sm text-base transition-colors"
         >
           Create Your First Reel — Free
         </a>

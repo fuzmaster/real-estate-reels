@@ -43,3 +43,10 @@ The app runs at `http://localhost:5173`, the API server at `http://localhost:300
 ## Rendering
 
 Rendering requires the local Express server (`node server.js`) plus Remotion and FFmpeg installed. The Vercel deployment hosts the UI only — all video processing happens on your machine.
+
+## Project organization
+
+- Historical patch notes live in `docs/patch-history/`.
+- Patch applicators live in `tools/patches/`.
+- Verification scripts live in `tools/verify/`.
+- Maintenance helpers live in `tools/maintenance/`.

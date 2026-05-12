@@ -6,6 +6,7 @@ import { ListingReel } from './ListingReel';
 import {
   PROJECT_FOLDER,
   LISTING_PHOTOS,
+  PHOTO_SETTINGS,
   AGENT_HEADSHOT_FILE,
   BROKERAGE_LOGO_FILE,
   BACKGROUND_MUSIC_FILE,
@@ -26,6 +27,14 @@ import {
   SHORT_DESCRIPTION,
   NEIGHBORHOOD,
   CLIP_DURATION_SECONDS,
+  VIDEO_STYLE,
+  PACING,
+  MUSIC_MOOD,
+  PHOTO_TRANSITION,
+  AUTO_ENHANCE,
+  SMART_SAFE_ZONES,
+  PERSISTENT_BRANDING,
+  PROGRESS_BAR,
 } from './campaign.config';
 
 const FPS = 30;
@@ -35,6 +44,7 @@ const HEIGHT = 1920;
 const sharedProps = {
   projectFolder: PROJECT_FOLDER,
   photos: LISTING_PHOTOS,
+  photoSettings: PHOTO_SETTINGS,
   headshotFile: AGENT_HEADSHOT_FILE,
   logoFile: BROKERAGE_LOGO_FILE,
   musicFile: BACKGROUND_MUSIC_FILE,
@@ -54,6 +64,14 @@ const sharedProps = {
   openHouseTime: OPEN_HOUSE_TIME,
   shortDescription: SHORT_DESCRIPTION,
   neighborhood: NEIGHBORHOOD,
+  videoStyle: VIDEO_STYLE,
+  pacing: PACING,
+  musicMood: MUSIC_MOOD,
+  photoTransition: PHOTO_TRANSITION,
+  autoEnhance: AUTO_ENHANCE,
+  smartSafeZones: SMART_SAFE_ZONES,
+  persistentBranding: PERSISTENT_BRANDING,
+  progressBar: PROGRESS_BAR,
 } as const;
 
 export const RemotionRoot: React.FC = () => {

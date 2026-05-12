@@ -9,9 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "real-estate-reels-web": "file:..",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "real-estate-reels-web": "file:.."
   },
   "devDependencies": {
     "@types/react": "^18.3.3",
