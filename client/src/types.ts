@@ -1,6 +1,31 @@
 // Real Estate Reels — form & API types.
 
+import type { PhotoFraming } from './utils/photoFraming';
+
 export type ReelTemplate = 'just-listed' | 'open-house' | 'just-sold';
+
+export type PhotoTransitionPreset =
+  | 'smart'
+  | 'fade'
+  | 'slide-left'
+  | 'slide-up'
+  | 'zoom-pop'
+  | 'whip'
+  | 'flash'
+  | 'none';
+
+export type PhotoTransition = PhotoTransitionPreset;
+
+export type VideoStyle = 'social-punchy' | 'luxury-cinematic' | 'brokerage-clean';
+export type PacingPreset = 'fast' | 'balanced' | 'cinematic';
+export type MusicMood =
+  | 'warm-inviting'
+  | 'modern-lofi'
+  | 'luxury-cinematic'
+  | 'upbeat-open-house'
+  | 'corporate-professional'
+  | 'urgent-driving'
+  | 'high-energy-social';
 
 export interface ListingAssets {
   photos: string[];        // relative paths under Photos/
@@ -47,8 +72,19 @@ export interface CampaignFormData {
   logo: string;           // empty string when absent
   music: string;          // empty string when absent
 
+  // Per-photo framing settings keyed by each relative photo path.
+  photoFraming: Record<string, PhotoFraming>;
+
   // Output config
   duration: number;       // seconds per reel
+  videoStyle: VideoStyle;
+  pacing: PacingPreset;
+  musicMood: MusicMood;
+  photoTransition: PhotoTransition;
+  safeZones: boolean;
+  autoEnhance: boolean;
+  persistentBranding: boolean;
+  progressBar: boolean;
 }
 
 export interface RenderJob {
@@ -69,3 +105,4 @@ export interface OutputCampaign {
   slug: string;
   files: OutputFile[];
 }
+

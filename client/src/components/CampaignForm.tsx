@@ -3,64 +3,73 @@ import {
   createProject, getListingAssets, getProjects, projectFileUrl,
   startRender, uploadHeadshot, uploadListingPhoto, uploadLogo, uploadMusic,
 } from '../api';
-import type { CampaignFormData, ReelTemplate } from '../types';
+import type { CampaignFormData, MusicMood, PacingPreset, ReelTemplate, VideoStyle, PhotoTransition } from '../types';
+import type { PhotoFraming } from '../utils/photoFraming';
+import { DEFAULT_PHOTO_FRAMING, getPhotoFraming } from '../utils/photoFraming';
+import FrameYourShotModal from './FrameYourShotModal';
 
 const TEMPLATE_OPTIONS: { id: ReelTemplate; label: string; description: string; defaultCta: string }[] = [
-  { id: 'just-listed', label: 'Just Listed',  description: 'New on the market — agent + property hero', defaultCta: 'Schedule a Showing' },
-  { id: 'open-house', label: 'Open House',   description: 'Date & time + property highlights',          defaultCta: 'Come to the Open House' },
-  { id: 'just-sold',  label: 'Just Sold',    description: 'Sold celebration + agent CTA',                defaultCta: 'See What Your Home Is Worth' },
+  { id: 'just-listed', label: 'Just Listed', description: 'New listing tour with property hook', defaultCta: 'DM TOUR FOR DETAILS' },
+  { id: 'open-house', label: 'Open House', description: 'Date, time, and showing CTA', defaultCta: 'DM OPEN HOUSE' },
+  { id: 'just-sold', label: 'Just Sold', description: 'Agent proof and seller CTA', defaultCta: 'SEE WHAT YOUR HOME IS WORTH' },
 ];
 
 const CTA_PRESETS = [
-  'Schedule a Showing',
-  'Message Me for Details',
-  'View the Full Listing',
-  'Come to the Open House',
-  'See What Your Home Is Worth',
+  'DM TOUR FOR DETAILS',
+  'COMMENT INFO FOR DETAILS',
+  'MESSAGE ME TO BOOK A TOUR',
+  'SEND THIS TO YOUR PARTNER',
+  'SEE WHAT YOUR HOME IS WORTH',
 ];
 
+const TRANSITION_OPTIONS: { id: PhotoTransition; label: string; description: string; tier: 'Free' | 'Pro' }[] = [
+  { id: 'smart', label: 'Smart Mix', description: 'Rotates between clean motion styles automatically.', tier: 'Free' },
+  { id: 'fade', label: 'Soft Fade', description: 'Simple safe crossfade-style entry.', tier: 'Free' },
+  { id: 'slide-left', label: 'Slide In', description: 'Photos slide into place with motion.', tier: 'Free' },
+  { id: 'zoom-pop', label: 'Zoom Pop', description: 'Fast social-media punch-in.', tier: 'Pro' },
+  { id: 'slide-up', label: 'Slide Up', description: 'Clean brokerage-style upward motion.', tier: 'Pro' },
+  { id: 'whip', label: 'Whip Pan', description: 'Fast energetic movement for social reels.', tier: 'Pro' },
+  { id: 'flash', label: 'Flash Cut', description: 'Bright transition for high-energy videos.', tier: 'Pro' },
+  { id: 'none', label: 'No Transition', description: 'Plain hard cuts.', tier: 'Free' },
+];
 const US_STATE_ABBREV = [
   'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
-  'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
+  'MA','MI','MN','MS','MO','MT','NE','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
   'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC',
 ];
 
-const TEMPLATE_KEY = 'rer-templates-v1';
-
-interface ListingTemplate {
-  id: string;
-  name: string;
-  agentName: string;
-  agentPhone: string;
-  agentEmail: string;
-  brokerageName: string;
-  ctaText: string;
-}
-
-function loadTemplates(): ListingTemplate[] {
-  try { return JSON.parse(localStorage.getItem(TEMPLATE_KEY) || '[]'); } catch { return []; }
-}
-function saveTemplates(t: ListingTemplate[]) {
-  localStorage.setItem(TEMPLATE_KEY, JSON.stringify(t));
-}
-
-// A default, friendly example to populate the form on first load.
 const DEFAULT_SAMPLE = {
-  propertyAddress: '123 Magnolia Lane',
-  city: 'Austin',
-  state: 'TX',
-  listingPrice: '$1,250,000',
+  propertyAddress: '123 Maple Street',
+  city: 'Windsor',
+  state: 'CT',
+  listingPrice: '$500,000',
   beds: '4',
-  baths: '3',
-  squareFeet: '2,840',
+  baths: '2',
+  squareFeet: '2,100',
   agentName: 'Jordan Carter',
-  agentPhone: '(512) 555-0142',
-  agentEmail: 'jordan@bluestonere.com',
+  agentPhone: '(860) 555-0142',
+  agentEmail: 'jordan@example.com',
   brokerageName: 'Bluestone Realty',
-  ctaText: 'Schedule a Showing',
-  shortDescription: 'Hill-country light, white-oak floors, and a chef’s kitchen.',
-  neighborhood: 'Travis Heights',
+  ctaText: 'DM TOUR FOR DETAILS',
+  shortDescription: 'A bright move-in ready home with flexible living space.',
+  neighborhood: 'Windsor Center',
 };
+
+function formatPriceInput(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (trimmed.includes('$')) return trimmed;
+  const digits = trimmed.replace(/[^0-9]/g, '');
+  if (!digits) return trimmed;
+  return `$${Number(digits).toLocaleString('en-US')}`;
+}
+
+function moveItem<T>(items: T[], from: number, to: number): T[] {
+  const next = [...items];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+}
 
 export default function CampaignForm({
   onRenderStarted,
@@ -71,7 +80,6 @@ export default function CampaignForm({
   onAddToQueue: (campaign: CampaignFormData) => void;
   serverOk: boolean | null;
 }) {
-  // Listing folder selection
   const [mode, setMode] = useState<'existing' | 'new'>('new');
   const [projects, setProjects] = useState<string[]>([]);
   const [selectedProject, setSelectedProject] = useState('');
@@ -79,7 +87,6 @@ export default function CampaignForm({
   const [creatingProject, setCreatingProject] = useState(false);
   const [projectReady, setProjectReady] = useState(false);
 
-  // Listing detail fields
   const [propertyAddress, setPropertyAddress] = useState(DEFAULT_SAMPLE.propertyAddress);
   const [city, setCity] = useState(DEFAULT_SAMPLE.city);
   const [state, setState] = useState(DEFAULT_SAMPLE.state);
@@ -87,23 +94,19 @@ export default function CampaignForm({
   const [beds, setBeds] = useState(DEFAULT_SAMPLE.beds);
   const [baths, setBaths] = useState(DEFAULT_SAMPLE.baths);
   const [squareFeet, setSquareFeet] = useState(DEFAULT_SAMPLE.squareFeet);
-
-  // Agent / brokerage
   const [agentName, setAgentName] = useState(DEFAULT_SAMPLE.agentName);
   const [agentPhone, setAgentPhone] = useState(DEFAULT_SAMPLE.agentPhone);
   const [agentEmail, setAgentEmail] = useState(DEFAULT_SAMPLE.agentEmail);
   const [brokerageName, setBrokerageName] = useState(DEFAULT_SAMPLE.brokerageName);
   const [ctaText, setCtaText] = useState(DEFAULT_SAMPLE.ctaText);
-
-  // Optional
   const [openHouseDate, setOpenHouseDate] = useState('');
   const [openHouseTime, setOpenHouseTime] = useState('');
   const [shortDescription, setShortDescription] = useState(DEFAULT_SAMPLE.shortDescription);
   const [neighborhood, setNeighborhood] = useState(DEFAULT_SAMPLE.neighborhood);
   const [mlsLink, setMlsLink] = useState('');
 
-  // Assets
   const [photos, setPhotos] = useState<string[]>([]);
+  const [photoFraming, setPhotoFraming] = useState<Record<string, PhotoFraming>>({});
   const [photosUploading, setPhotosUploading] = useState(false);
   const [headshot, setHeadshot] = useState('');
   const [headshotUploading, setHeadshotUploading] = useState(false);
@@ -112,21 +115,21 @@ export default function CampaignForm({
   const [music, setMusic] = useState('');
   const [musicUploading, setMusicUploading] = useState(false);
 
-  // Templates
   const [templates, setTemplates] = useState<ReelTemplate[]>(['just-listed']);
+  const [duration, setDuration] = useState(15);
+  const [videoStyle, setVideoStyle] = useState<VideoStyle>('social-punchy');
+  const [pacing, setPacing] = useState<PacingPreset>('fast');
+  const [musicMood, setMusicMood] = useState<MusicMood>('warm-inviting');
+  const [photoTransition, setPhotoTransition] = useState<PhotoTransition>('smart');
+  const [safeZones, setSafeZones] = useState(true);
+  const [autoEnhance, setAutoEnhance] = useState(true);
+  const [persistentBranding, setPersistentBranding] = useState(true);
+  const [progressBar, setProgressBar] = useState(true);
 
-  // Output config
-  const [duration, setDuration] = useState(18);
-
-  // Saved agent profiles
-  const [profiles, setProfiles] = useState<ListingTemplate[]>(loadTemplates);
-  const [profileName, setProfileName] = useState('');
-  const [savingProfile, setSavingProfile] = useState(false);
-
-  // Submit state
   const [submitting, setSubmitting] = useState(false);
   const [queuedFeedback, setQueuedFeedback] = useState(false);
   const [error, setError] = useState('');
+  const [frameEditorPhoto, setFrameEditorPhoto] = useState<string | null>(null);
 
   const photosInputRef = useRef<HTMLInputElement>(null);
   const headshotInputRef = useRef<HTMLInputElement>(null);
@@ -135,14 +138,12 @@ export default function CampaignForm({
 
   const activeName = mode === 'new' ? newProjectName.trim() : selectedProject;
 
-  // Load listing list on mount
   useEffect(() => {
     getProjects().then(setProjects).catch(() => {
       if (serverOk !== false) setError('Could not load listings. Is the server running?');
     });
-  }, []);
+  }, [serverOk]);
 
-  // When an existing listing is selected, load its assets
   useEffect(() => {
     if (mode !== 'existing' || !selectedProject) return;
     setProjectReady(true);
@@ -151,15 +152,20 @@ export default function CampaignForm({
       setHeadshot(a.headshot || '');
       setLogo(a.logo || '');
       setMusic(a.music || '');
+      setPhotoFraming(prev => {
+        const next = { ...prev };
+        for (const p of a.photos) if (!next[p]) next[p] = DEFAULT_PHOTO_FRAMING;
+        return next;
+      });
     }).catch(() => {});
   }, [selectedProject, mode]);
 
-  // Reset assets when switching modes
   useEffect(() => {
     setSelectedProject('');
     setNewProjectName('');
     setProjectReady(false);
     setPhotos([]);
+    setPhotoFraming({});
     setHeadshot('');
     setLogo('');
     setMusic('');
@@ -176,11 +182,8 @@ export default function CampaignForm({
       setProjects(p => [...p, name].sort());
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed';
-      if (msg.includes('already exists')) {
-        setProjectReady(true);
-      } else {
-        setError(msg);
-      }
+      if (msg.includes('already exists')) setProjectReady(true);
+      else setError(msg);
     } finally {
       setCreatingProject(false);
     }
@@ -199,6 +202,11 @@ export default function CampaignForm({
         uploaded.push(saved);
       }
       setPhotos(p => Array.from(new Set([...p, ...uploaded])));
+      setPhotoFraming(prev => {
+        const next = { ...prev };
+        for (const p of uploaded) next[p] = DEFAULT_PHOTO_FRAMING;
+        return next;
+      });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Upload failed');
     } finally {
@@ -209,51 +217,59 @@ export default function CampaignForm({
   async function handleHeadshotUpload(file: File) {
     if (!activeName || !projectReady) return setError('Create or select a listing first.');
     setHeadshotUploading(true);
-    try {
-      const saved = await uploadHeadshot(activeName, file);
-      setHeadshot(saved);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Upload failed');
-    } finally {
-      setHeadshotUploading(false);
-    }
+    try { setHeadshot(await uploadHeadshot(activeName, file)); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : 'Upload failed'); }
+    finally { setHeadshotUploading(false); }
   }
 
   async function handleLogoUpload(file: File) {
     if (!activeName || !projectReady) return setError('Create or select a listing first.');
     setLogoUploading(true);
-    try {
-      const saved = await uploadLogo(activeName, file);
-      setLogo(saved);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Upload failed');
-    } finally {
-      setLogoUploading(false);
-    }
+    try { setLogo(await uploadLogo(activeName, file)); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : 'Upload failed'); }
+    finally { setLogoUploading(false); }
   }
 
   async function handleMusicUpload(file: File) {
     if (!activeName || !projectReady) return setError('Create or select a listing first.');
     setMusicUploading(true);
-    try {
-      const saved = await uploadMusic(activeName, file);
-      setMusic(saved);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Upload failed');
-    } finally {
-      setMusicUploading(false);
-    }
+    try { setMusic(await uploadMusic(activeName, file)); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : 'Upload failed'); }
+    finally { setMusicUploading(false); }
   }
 
   function toggleTemplate(id: ReelTemplate) {
     setTemplates(prev => {
       const next = prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id];
-      // When user adds Open House, default CTA if blank or generic
-      if (!prev.includes('open-house') && id === 'open-house' && !ctaText) {
-        setCtaText('Come to the Open House');
-      }
+      const opt = TEMPLATE_OPTIONS.find(t => t.id === id);
+      if (opt && !prev.includes(id)) setCtaText(opt.defaultCta);
       return next;
     });
+  }
+
+  function makeHero(index: number) {
+    if (index <= 0) return;
+    setPhotos(p => moveItem(p, index, 0));
+  }
+
+  function movePhoto(index: number, direction: -1 | 1) {
+    const to = index + direction;
+    if (to < 0 || to >= photos.length) return;
+    setPhotos(p => moveItem(p, index, to));
+  }
+
+  function removePhoto(photo: string) {
+    setPhotos(arr => arr.filter(x => x !== photo));
+    setPhotoFraming(prev => {
+      const next = { ...prev };
+      delete next[photo];
+      return next;
+    });
+  }
+
+  function saveFraming(photo: string, settings: PhotoFraming) {
+    setPhotoFraming(prev => ({ ...prev, [photo]: settings }));
+    setFrameEditorPhoto(null);
   }
 
   function buildPayload(): CampaignFormData | null {
@@ -269,7 +285,7 @@ export default function CampaignForm({
       propertyAddress,
       city,
       state,
-      listingPrice,
+      listingPrice: formatPriceInput(listingPrice),
       beds,
       baths,
       squareFeet,
@@ -277,17 +293,26 @@ export default function CampaignForm({
       agentPhone,
       agentEmail,
       brokerageName,
-      ctaText: ctaText.trim() || 'Schedule a Showing',
+      ctaText: ctaText.trim().toUpperCase() || 'DM TOUR FOR DETAILS',
       openHouseDate,
       openHouseTime,
       shortDescription,
       neighborhood,
       mlsLink,
       photos,
+      photoFraming,
       headshot,
       logo,
       music,
       duration,
+      videoStyle,
+      pacing,
+      musicMood,
+      photoTransition,
+      safeZones,
+      autoEnhance,
+      persistentBranding,
+      progressBar,
     };
   }
 
@@ -297,7 +322,7 @@ export default function CampaignForm({
     if (!payload) return;
     onAddToQueue(payload);
     setQueuedFeedback(true);
-    setTimeout(() => setQueuedFeedback(false), 2500);
+    setTimeout(() => setQueuedFeedback(false), 2200);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -316,523 +341,237 @@ export default function CampaignForm({
     }
   }
 
-  function handleSaveProfile() {
-    const name = profileName.trim() || `Profile ${profiles.length + 1}`;
-    const profile: ListingTemplate = {
-      id: Date.now().toString(),
-      name, agentName, agentPhone, agentEmail, brokerageName, ctaText,
-    };
-    const updated = [...profiles, profile];
-    setProfiles(updated);
-    saveTemplates(updated);
-    setProfileName('');
-    setSavingProfile(false);
-  }
-
-  function handleLoadProfile(p: ListingTemplate) {
-    setAgentName(p.agentName);
-    setAgentPhone(p.agentPhone);
-    setAgentEmail(p.agentEmail);
-    setBrokerageName(p.brokerageName);
-    setCtaText(p.ctaText);
-  }
-
-  function handleDeleteProfile(id: string) {
-    const updated = profiles.filter(p => p.id !== id);
-    setProfiles(updated);
-    saveTemplates(updated);
-  }
-
-  const fileCount = templates.length;
+  const frameEditorUrl = frameEditorPhoto && activeName ? projectFileUrl(activeName, frameEditorPhoto) : '';
 
   return (
     <form id="campaign-form" onSubmit={handleSubmit}>
       <div className="space-y-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-white mb-1">New Listing Reel</h1>
-            <p className="text-neutral-400 text-sm">
-              Fill in the listing details and choose a video template.
-            </p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold text-white mb-1">New Listing Reel</h1>
+          <p className="text-neutral-400 text-sm">Upload photos, frame each shot, choose a vibe, then render.</p>
         </div>
 
-        {error && (
-          <div className="bg-red-950/50 border border-red-800 text-red-300 px-4 py-3 rounded-lg text-sm">
-            {error}
-          </div>
-        )}
+        {error && <div className="bg-red-950/50 border border-red-800 text-red-300 px-4 py-3 rounded-lg text-sm">{error}</div>}
 
-        {/* ── Saved agent profiles ── */}
-        {(profiles.length > 0 || savingProfile) && (
-          <Card title="Agent Profiles">
-            {profiles.length > 0 && (
-              <div className="space-y-1.5 mb-4">
-                {profiles.map(p => (
-                  <div key={p.id} className="flex items-center gap-2 bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2">
-                    <span className="flex-1 text-sm text-neutral-200 truncate">{p.name}</span>
-                    <span className="text-xs text-neutral-500 truncate hidden sm:block">{p.brokerageName}</span>
-                    <button type="button" onClick={() => handleLoadProfile(p)}
-                      className="text-xs text-white bg-neutral-700 hover:bg-neutral-600 px-2.5 py-1 rounded transition-colors flex-shrink-0">
-                      Load
-                    </button>
-                    <button type="button" onClick={() => handleDeleteProfile(p.id)}
-                      className="text-xs text-neutral-600 hover:text-red-400 transition-colors flex-shrink-0 px-1">
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            {savingProfile ? (
-              <div className="flex gap-2">
-                <input
-                  value={profileName}
-                  onChange={e => setProfileName(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSaveProfile(); } if (e.key === 'Escape') setSavingProfile(false); }}
-                  placeholder={`Profile ${profiles.length + 1}`}
-                  autoFocus
-                  className={`${inputClass} flex-1`}
-                />
-                <button type="button" onClick={handleSaveProfile}
-                  className="bg-white hover:bg-neutral-200 text-black text-sm font-medium px-4 py-2 rounded-lg transition-colors flex-shrink-0">
-                  Save
-                </button>
-                <button type="button" onClick={() => setSavingProfile(false)}
-                  className="text-neutral-500 hover:text-white text-sm px-3 py-2 rounded-lg transition-colors flex-shrink-0">
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <button type="button" onClick={() => setSavingProfile(true)}
-                className="text-xs text-neutral-400 hover:text-white bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 px-3 py-1.5 rounded-lg transition-colors">
-                + Save current agent details as profile
-              </button>
-            )}
-          </Card>
-        )}
-        {profiles.length === 0 && !savingProfile && (
-          <div className="flex justify-end">
-            <button type="button" onClick={() => setSavingProfile(true)}
-              className="text-xs text-neutral-600 hover:text-neutral-400 transition-colors">
-              + Save agent details as profile
-            </button>
-          </div>
-        )}
-
-        {/* ── Listing folder ── */}
-        <Card title="Listing Folder" help="Each listing gets its own folder on disk. Use New for a fresh listing, or Existing to reopen one you've already started.">
+        <Card title="Listing Folder" help="Each listing gets its own folder. Use New for a fresh listing or Existing to reopen one.">
           <div className="flex gap-1 bg-neutral-950 border border-neutral-700 rounded-lg p-1 w-fit mb-4">
             <ModeBtn active={mode === 'new'} onClick={() => setMode('new')}>New Listing</ModeBtn>
             <ModeBtn active={mode === 'existing'} onClick={() => setMode('existing')}>Existing Listing</ModeBtn>
           </div>
-
           {mode === 'existing' ? (
-            <select
-              value={selectedProject}
-              onChange={e => setSelectedProject(e.target.value)}
-              className={selectClass}
-              required
-            >
+            <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)} className={selectClass} required>
               <option value="">— Select a listing —</option>
               {projects.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           ) : (
             <div className="flex gap-2">
-              <input
-                type="text"
-                value={newProjectName}
-                onChange={e => setNewProjectName(e.target.value)}
-                placeholder="123 Magnolia Lane"
-                className={`${inputClass} flex-1`}
-              />
-              <button
-                type="button"
-                onClick={handleCreateProject}
-                disabled={creatingProject || !newProjectName.trim() || projectReady}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex-shrink-0
-                  ${projectReady
-                    ? 'bg-white/10 text-white border border-white/40'
-                    : 'bg-neutral-700 hover:bg-neutral-600 text-white disabled:opacity-40'}`}
-              >
+              <input value={newProjectName} onChange={e => setNewProjectName(e.target.value)} placeholder="123 Maple Street" className={`${inputClass} flex-1`} />
+              <button type="button" onClick={handleCreateProject} disabled={creatingProject || !newProjectName.trim() || projectReady}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex-shrink-0 ${projectReady ? 'bg-white/10 text-white border border-white/40' : 'bg-neutral-700 hover:bg-neutral-600 text-white disabled:opacity-40'}`}>
                 {projectReady ? '✓ Created' : creatingProject ? 'Creating…' : 'Create Folder'}
               </button>
             </div>
           )}
         </Card>
 
-        {/* ── Listing details ── */}
         <Card title="Listing Details">
           <div className="grid grid-cols-2 gap-4">
-            <Label text="Property Address *" full>
-              <input value={propertyAddress} onChange={e => setPropertyAddress(e.target.value)}
-                placeholder="123 Magnolia Lane" className={inputClass} />
-            </Label>
-            <Label text="City *">
-              <input value={city} onChange={e => setCity(e.target.value)}
-                placeholder="Austin" className={inputClass} />
-            </Label>
-            <Label text="State *">
-              <select value={state} onChange={e => setState(e.target.value)} className={selectClass}>
-                <option value="">—</option>
-                {US_STATE_ABBREV.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </Label>
-            <Label text="Listing Price *">
-              <input value={listingPrice} onChange={e => setListingPrice(e.target.value)}
-                placeholder="$1,250,000" className={inputClass} />
-            </Label>
-            <Label text="Beds *">
-              <input value={beds} onChange={e => setBeds(e.target.value)} inputMode="numeric"
-                placeholder="4" className={inputClass} />
-            </Label>
-            <Label text="Baths *">
-              <input value={baths} onChange={e => setBaths(e.target.value)} inputMode="numeric"
-                placeholder="3" className={inputClass} />
-            </Label>
-            <Label text="Square Feet *">
-              <input value={squareFeet} onChange={e => setSquareFeet(e.target.value)}
-                placeholder="2,840" className={inputClass} />
-            </Label>
-            <Label text="Neighborhood">
-              <input value={neighborhood} onChange={e => setNeighborhood(e.target.value)}
-                placeholder="Travis Heights" className={inputClass} />
-            </Label>
-            <Label text="Short Description" full>
-              <input value={shortDescription} onChange={e => setShortDescription(e.target.value)}
-                placeholder="Hill-country light, white-oak floors, and a chef’s kitchen."
-                className={inputClass} />
-            </Label>
-            <Label text="MLS Link" full>
-              <input value={mlsLink} onChange={e => setMlsLink(e.target.value)}
-                placeholder="https://"
-                className={inputClass} />
-            </Label>
+            <Label text="Property Address *" full><input value={propertyAddress} onChange={e => setPropertyAddress(e.target.value)} className={inputClass} /></Label>
+            <Label text="City *"><input value={city} onChange={e => setCity(e.target.value)} className={inputClass} /></Label>
+            <Label text="State *"><select value={state} onChange={e => setState(e.target.value)} className={selectClass}><option value="">—</option>{US_STATE_ABBREV.map(s => <option key={s} value={s}>{s}</option>)}</select></Label>
+            <Label text="Listing Price *"><input value={listingPrice} onChange={e => setListingPrice(e.target.value)} onBlur={() => setListingPrice(formatPriceInput(listingPrice))} className={inputClass} /></Label>
+            <Label text="Beds *"><input value={beds} onChange={e => setBeds(e.target.value)} className={inputClass} /></Label>
+            <Label text="Baths *"><input value={baths} onChange={e => setBaths(e.target.value)} className={inputClass} /></Label>
+            <Label text="Square Feet *"><input value={squareFeet} onChange={e => setSquareFeet(e.target.value)} className={inputClass} /></Label>
+            <Label text="Neighborhood"><input value={neighborhood} onChange={e => setNeighborhood(e.target.value)} className={inputClass} /></Label>
+            <Label text="Short Description" full><input value={shortDescription} onChange={e => setShortDescription(e.target.value)} className={inputClass} /></Label>
+            <Label text="MLS Link" full><input value={mlsLink} onChange={e => setMlsLink(e.target.value)} placeholder="https://" className={inputClass} /></Label>
           </div>
         </Card>
 
-        {/* ── Open house ── */}
         {templates.includes('open-house') && (
           <Card title="Open House Details">
             <div className="grid grid-cols-2 gap-4">
-              <Label text="Open House Date">
-                <input type="date" value={openHouseDate} onChange={e => setOpenHouseDate(e.target.value)}
-                  className={inputClass} />
-              </Label>
-              <Label text="Open House Time">
-                <input value={openHouseTime} onChange={e => setOpenHouseTime(e.target.value)}
-                  placeholder="Sat 1:00 – 4:00 PM"
-                  className={inputClass} />
-              </Label>
+              <Label text="Open House Date"><input type="date" value={openHouseDate} onChange={e => setOpenHouseDate(e.target.value)} className={inputClass} /></Label>
+              <Label text="Open House Time"><input value={openHouseTime} onChange={e => setOpenHouseTime(e.target.value)} placeholder="Sat 1:00 – 4:00 PM" className={inputClass} /></Label>
             </div>
           </Card>
         )}
 
-        {/* ── Agent branding ── */}
         <Card title="Agent Branding">
           <div className="grid grid-cols-2 gap-4">
-            <Label text="Agent Name *">
-              <input value={agentName} onChange={e => setAgentName(e.target.value)}
-                placeholder="Jordan Carter" className={inputClass} />
-            </Label>
-            <Label text="Brokerage Name *">
-              <input value={brokerageName} onChange={e => setBrokerageName(e.target.value)}
-                placeholder="Bluestone Realty" className={inputClass} />
-            </Label>
-            <Label text="Agent Phone *">
-              <input value={agentPhone} onChange={e => setAgentPhone(e.target.value)}
-                placeholder="(512) 555-0142" className={inputClass} />
-            </Label>
-            <Label text="Agent Email *">
-              <input type="email" value={agentEmail} onChange={e => setAgentEmail(e.target.value)}
-                placeholder="agent@brokerage.com" className={inputClass} />
-            </Label>
+            <Label text="Agent Name *"><input value={agentName} onChange={e => setAgentName(e.target.value)} className={inputClass} /></Label>
+            <Label text="Brokerage Name *"><input value={brokerageName} onChange={e => setBrokerageName(e.target.value)} className={inputClass} /></Label>
+            <Label text="Agent Phone *"><input value={agentPhone} onChange={e => setAgentPhone(e.target.value)} className={inputClass} /></Label>
+            <Label text="Agent Email *"><input type="email" value={agentEmail} onChange={e => setAgentEmail(e.target.value)} className={inputClass} /></Label>
           </div>
-
           <div className="mt-4 pt-4 border-t border-neutral-800">
             <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2">CTA Text</p>
             <div className="flex flex-wrap gap-1.5 mb-2">
-              {CTA_PRESETS.map(p => (
-                <button key={p} type="button"
-                  onClick={() => setCtaText(p)}
-                  className={`px-2.5 py-1 rounded text-xs transition-colors
-                    ${ctaText === p
-                      ? 'bg-white/10 border border-white/60 text-white'
-                      : 'bg-neutral-800 border border-neutral-700 text-neutral-400 hover:text-white hover:border-neutral-500'}`}>
-                  {p}
-                </button>
-              ))}
+              {CTA_PRESETS.map(p => <button key={p} type="button" onClick={() => setCtaText(p)} className={`px-2.5 py-1 rounded text-xs transition-colors ${ctaText === p ? 'bg-white/10 border border-white/60 text-white' : 'bg-neutral-800 border border-neutral-700 text-neutral-400 hover:text-white hover:border-neutral-500'}`}>{p}</button>)}
             </div>
-            <input value={ctaText} onChange={e => setCtaText(e.target.value)}
-              placeholder="Schedule a Showing"
-              className={inputClass} />
+            <input value={ctaText} onChange={e => setCtaText(e.target.value.toUpperCase())} className={inputClass} />
           </div>
         </Card>
 
-        {/* ── Upload Photos ── */}
-        <Card
-          title={`Listing Photos (${photos.length})`}
-          help="JPG or PNG. The first photo is treated as the hero shot. Order matters — earlier photos appear first in the reel."
-          action={
-            <div className="flex gap-1">
-              <button type="button"
-                onClick={() => photosInputRef.current?.click()}
-                disabled={!projectReady || photosUploading}
-                className="text-xs text-neutral-300 hover:text-white bg-neutral-800 hover:bg-neutral-700 px-3 py-1 rounded transition-colors disabled:opacity-40">
-                {photosUploading ? 'Uploading…' : '+ Add Photos'}
-              </button>
-              <input ref={photosInputRef} type="file" accept="image/*" multiple className="hidden"
-                onChange={e => { if (e.target.files?.length) handlePhotoUpload(e.target.files); e.target.value = ''; }} />
-            </div>
-          }
-        >
+        <Card title={`Photos + Framing (${photos.length})`} help="First photo becomes the hero opener. Drag/reorder later; for now use the arrows or Make Hero." action={<button type="button" onClick={() => photosInputRef.current?.click()} disabled={!projectReady || photosUploading} className="text-xs text-neutral-300 hover:text-white bg-neutral-800 hover:bg-neutral-700 px-3 py-1 rounded transition-colors disabled:opacity-40">{photosUploading ? 'Uploading…' : '+ Add Photos'}</button>}>
+          <input ref={photosInputRef} type="file" accept="image/*" multiple className="hidden" onChange={e => { if (e.target.files?.length) handlePhotoUpload(e.target.files); e.target.value = ''; }} />
           {photos.length === 0 ? (
-            <div
-              onClick={() => projectReady && photosInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-xl py-10 text-center transition-colors
-                ${projectReady ? 'border-neutral-700 hover:border-neutral-500 cursor-pointer' : 'border-neutral-800 opacity-50'}`}
-            >
+            <div onClick={() => projectReady && photosInputRef.current?.click()} className={`border-2 border-dashed rounded-xl py-10 text-center transition-colors ${projectReady ? 'border-neutral-700 hover:border-neutral-500 cursor-pointer' : 'border-neutral-800 opacity-50'}`}>
               <div className="text-3xl mb-1">🏠</div>
-              <p className="text-sm text-neutral-400">
-                {projectReady ? 'Drop photos here or click to upload' : 'Create or select a listing first'}
-              </p>
+              <p className="text-sm text-neutral-400">{projectReady ? 'Click to upload listing photos' : 'Create or select a listing first'}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-4 gap-2">
-              {photos.map((p, i) => (
-                <div key={p} className="relative aspect-square rounded-lg overflow-hidden border border-neutral-700 bg-neutral-950">
-                  <img src={projectFileUrl(activeName, p)} className="w-full h-full object-cover" />
-                  <div className="absolute top-1 left-1 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded">
-                    {i + 1}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {photos.map((p, i) => {
+                const framing = getPhotoFraming(photoFraming, p);
+                return (
+                  <div key={p} className="rounded-xl overflow-hidden border border-neutral-700 bg-neutral-950">
+                    <div className="relative aspect-[9/10] overflow-hidden bg-black">
+                      {framing.cropMode === 'whole' ? (
+                        <>
+                          <img src={projectFileUrl(activeName, p)} className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'blur(18px) brightness(0.25)', transform: 'scale(1.18)' }} />
+                          <img src={projectFileUrl(activeName, p)} className="absolute inset-0 w-full h-full object-contain" />
+                        </>
+                      ) : (
+                        <img src={projectFileUrl(activeName, p)} className="w-full h-full object-cover" style={{ objectPosition: `${50 + framing.x}% ${50 + framing.y}%`, transform: `scale(${framing.scale})` }} />
+                      )}
+                      <div className="absolute top-2 left-2 bg-black/75 text-white text-[10px] font-bold px-2 py-1 rounded-full">{i === 0 ? 'HERO' : `#${i + 1}`}</div>
+                      <div className="absolute bottom-2 left-2 bg-black/75 text-white text-[10px] font-bold px-2 py-1 rounded-full">{framing.cropMode === 'whole' ? 'WHOLE ROOM' : 'FILL SCREEN'}</div>
+                      <button type="button" onClick={() => removePhoto(p)} className="absolute top-2 right-2 bg-black/75 hover:bg-red-600 text-white text-xs w-7 h-7 rounded-full">×</button>
+                    </div>
+                    <div className="p-3 space-y-2">
+                      <button type="button" onClick={() => setFrameEditorPhoto(p)} className="w-full bg-white hover:bg-neutral-200 text-black text-xs font-bold px-3 py-2 rounded-lg">FRAME SHOT</button>
+                      <div className="grid grid-cols-3 gap-1">
+                        <button type="button" disabled={i === 0} onClick={() => movePhoto(i, -1)} className="bg-neutral-800 disabled:opacity-30 hover:bg-neutral-700 text-neutral-200 text-xs px-2 py-1.5 rounded">↑</button>
+                        <button type="button" disabled={i === 0} onClick={() => makeHero(i)} className="bg-neutral-800 disabled:opacity-30 hover:bg-neutral-700 text-neutral-200 text-xs px-2 py-1.5 rounded">Hero</button>
+                        <button type="button" disabled={i === photos.length - 1} onClick={() => movePhoto(i, 1)} className="bg-neutral-800 disabled:opacity-30 hover:bg-neutral-700 text-neutral-200 text-xs px-2 py-1.5 rounded">↓</button>
+                      </div>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setPhotos(arr => arr.filter(x => x !== p))}
-                    className="absolute top-1 right-1 bg-black/70 hover:bg-red-600 text-white text-[10px] w-5 h-5 rounded flex items-center justify-center"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Card>
 
-        {/* ── Headshot / Logo / Music ── */}
         <Card title="Optional Branding Assets">
           <div className="grid grid-cols-3 gap-4">
-            {/* Headshot */}
-            <div>
-              <p className="text-xs text-neutral-500 mb-2">Agent Headshot</p>
-              <SquareDrop
-                src={headshot ? projectFileUrl(activeName, headshot) : null}
-                uploading={headshotUploading}
-                locked={!projectReady}
-                accept="image/*"
-                onFile={handleHeadshotUpload}
-                inputRef={headshotInputRef}
-                emoji="🧑"
-                hint="Square works best"
-              />
-            </div>
-            {/* Logo */}
-            <div>
-              <p className="text-xs text-neutral-500 mb-2">Brokerage Logo</p>
-              <SquareDrop
-                src={logo ? projectFileUrl(activeName, logo) : null}
-                uploading={logoUploading}
-                locked={!projectReady}
-                accept="image/*"
-                onFile={handleLogoUpload}
-                inputRef={logoInputRef}
-                emoji="🏢"
-                hint="PNG with transparency"
-              />
-            </div>
-            {/* Music */}
-            <div>
-              <p className="text-xs text-neutral-500 mb-2">Background Music</p>
-              <SquareDrop
-                src={null}
-                filename={music ? music.split('/').pop() : ''}
-                uploading={musicUploading}
-                locked={!projectReady}
-                accept="audio/*,.wav,.mp3,.aac,.m4a"
-                onFile={handleMusicUpload}
-                inputRef={musicInputRef}
-                emoji="🎵"
-                hint="Optional"
-              />
-            </div>
+            <SquareDrop label="Agent Headshot" src={headshot ? projectFileUrl(activeName, headshot) : null} filename="" uploading={headshotUploading} locked={!projectReady} accept="image/*" onFile={handleHeadshotUpload} inputRef={headshotInputRef} emoji="🧑" hint="Square works best" />
+            <SquareDrop label="Brokerage Logo" src={logo ? projectFileUrl(activeName, logo) : null} filename="" uploading={logoUploading} locked={!projectReady} accept="image/*" onFile={handleLogoUpload} inputRef={logoInputRef} emoji="🏢" hint="PNG preferred" />
+            <SquareDrop label="Music Track" src={null} filename={music ? music.split('/').pop() : ''} uploading={musicUploading} locked={!projectReady} accept="audio/*,.wav,.mp3,.aac,.m4a" onFile={handleMusicUpload} inputRef={musicInputRef} emoji="🎵" hint="Optional" />
           </div>
         </Card>
 
-        {/* ── Templates ── */}
-        <Card title="Choose Video Template" help="Pick one or more templates. Each selected template produces one rendered video.">
-          <div className="grid grid-cols-3 gap-3">
-            {TEMPLATE_OPTIONS.map(opt => {
-              const on = templates.includes(opt.id);
+        <Card title="Video Controls" help="Keep this simple. These are the controls that can later become Free / Pro / Brokerage gates.">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Label text="Video Style"><select value={videoStyle} onChange={e => setVideoStyle(e.target.value as VideoStyle)} className={selectClass}><option value="social-punchy">Social Punchy</option><option value="luxury-cinematic">Luxury Cinematic</option><option value="brokerage-clean">Brokerage Clean</option></select></Label>
+            <Label text="Pacing"><select value={pacing} onChange={e => setPacing(e.target.value as PacingPreset)} className={selectClass}><option value="fast">Fast Cuts</option><option value="balanced">Balanced</option><option value="cinematic">Cinematic</option></select></Label>
+            <Label text="Music Mood"><select value={musicMood} onChange={e => setMusicMood(e.target.value as MusicMood)} className={selectClass}><option value="warm-inviting">Warm & Inviting</option><option value="modern-lofi">Modern Lo-Fi</option><option value="luxury-cinematic">Luxury Cinematic</option><option value="upbeat-open-house">Upbeat Open House</option><option value="corporate-professional">Corporate Professional</option><option value="urgent-driving">Urgent & Driving</option><option value="high-energy-social">High Energy Social</option></select></Label>
+            <Label text={`Duration — ${duration}s`}><input type="range" value={duration} onChange={e => setDuration(parseInt(e.target.value))} min={10} max={30} step={1} className="w-full cursor-pointer" /></Label>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-4">
+            <Toggle label="Safe Zones" checked={safeZones} onChange={setSafeZones} />
+            <Toggle label="Auto-Enhance" checked={autoEnhance} onChange={setAutoEnhance} />
+            <Toggle label="Agent Branding" checked={persistentBranding} onChange={setPersistentBranding} />
+            <Toggle label="Progress Bar" checked={progressBar} onChange={setProgressBar} />
+          </div>
+        </Card>
+        <Card title="Photo Transition Style" help="How listing photos move between scenes. Smart Mix works for any listing. Pro transitions unlock with upgrade.">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {TRANSITION_OPTIONS.map(opt => {
+              const selected = photoTransition === opt.id;
+              const isPro = opt.tier === 'Pro';
               return (
-                <button key={opt.id} type="button" onClick={() => toggleTemplate(opt.id)}
-                  className={`p-3 rounded-lg border text-left transition-colors
-                    ${on ? 'bg-white/10 border-white/60 text-white'
-                      : 'bg-neutral-900 border-neutral-700 text-neutral-400 hover:border-neutral-500'}`}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`w-3 h-3 rounded-sm border-2 flex-shrink-0 transition-colors
-                      ${on ? 'bg-white border-white' : 'border-neutral-500'}`} />
-                    <span className="font-semibold text-sm">{opt.label}</span>
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setPhotoTransition(opt.id as PhotoTransition)}
+                  className={`relative text-left rounded-xl border p-3 transition-colors ${
+                    selected
+                      ? 'bg-white/10 border-white/50 text-white'
+                      : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-600 hover:text-neutral-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-1 mb-1.5">
+                    <span className="text-base leading-none">
+                      {opt.id === 'smart'      ? '✦' :
+                       opt.id === 'fade'       ? '◑' :
+                       opt.id === 'slide-left' ? '→' :
+                       opt.id === 'slide-up'   ? '↑' :
+                       opt.id === 'zoom-pop'   ? '⊕' :
+                       opt.id === 'whip'       ? '⚡' :
+                       opt.id === 'flash'      ? '◈' : '▣'}
+                    </span>
+                    {isPro && (
+                      <span className="text-[9px] font-black uppercase tracking-wider bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                        Pro
+                      </span>
+                    )}
                   </div>
-                  <p className="text-xs text-neutral-500 pl-5">{opt.description}</p>
+                  <div className="text-xs font-bold leading-tight mb-1">{opt.label}</div>
+                  <div className="text-[11px] text-neutral-500 leading-snug">{opt.description}</div>
+                  {selected && (
+                    <div className="absolute bottom-2 right-2 w-1.5 h-1.5 rounded-full bg-white" />
+                  )}
                 </button>
               );
             })}
           </div>
+        </Card>
 
-          <div className="mt-4 pt-4 border-t border-neutral-800">
-            <label className="block text-xs text-neutral-500 mb-1.5">
-              Duration — <span className="text-neutral-200 font-mono">{duration}s</span>
-            </label>
-            <input type="range" value={duration} onChange={e => setDuration(parseInt(e.target.value))}
-              min={10} max={30} step={1}
-              className="w-full cursor-pointer" />
-            <div className="flex justify-between text-xs text-neutral-600 mt-0.5">
-              <span>10s</span><span>30s</span>
-            </div>
+
+
+        <Card title="Choose Video Template">
+          <div className="grid grid-cols-3 gap-3">
+            {TEMPLATE_OPTIONS.map(opt => {
+              const on = templates.includes(opt.id);
+              return <button key={opt.id} type="button" onClick={() => toggleTemplate(opt.id)} className={`p-3 rounded-lg border text-left transition-colors ${on ? 'bg-white/10 border-white/60 text-white' : 'bg-neutral-900 border-neutral-700 text-neutral-400 hover:border-neutral-500'}`}><div className="font-semibold text-sm">{opt.label}</div><p className="text-xs text-neutral-500 mt-1">{opt.description}</p></button>;
+            })}
           </div>
         </Card>
 
-        {/* ── Submit ── */}
         <div className="flex flex-wrap items-center gap-3 pb-10">
-          <button type="submit" disabled={submitting}
-            className="bg-white hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold px-8 py-3 rounded-lg transition-colors text-sm tracking-wide">
-            {submitting ? 'Starting…' : 'RENDER NOW'}
-          </button>
-          <button
-            type="button"
-            onClick={handleAddToQueue}
-            className="bg-neutral-800 hover:bg-neutral-700 text-white font-medium px-6 py-3 rounded-lg transition-colors text-sm border border-neutral-700"
-          >
-            {queuedFeedback ? '✓ Added to Queue' : '+ Add to Queue'}
-          </button>
-          {fileCount > 0 && (
-            <span className="text-xs text-neutral-500 ml-1">
-              {fileCount} file{fileCount !== 1 ? 's' : ''}
-            </span>
-          )}
+          <button type="submit" disabled={submitting} className="bg-white hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold px-8 py-3 rounded-lg transition-colors text-sm tracking-wide">{submitting ? 'Starting…' : 'RENDER NOW'}</button>
+          <button type="button" onClick={handleAddToQueue} className="bg-neutral-800 hover:bg-neutral-700 text-white font-medium px-6 py-3 rounded-lg transition-colors text-sm border border-neutral-700">{queuedFeedback ? '✓ Added to Queue' : '+ Add to Queue'}</button>
+          <span className="text-xs text-neutral-500">{templates.length} output{templates.length !== 1 ? 's' : ''}</span>
         </div>
       </div>
+
+      {frameEditorPhoto && frameEditorUrl && (
+        <FrameYourShotModal
+          open={!!frameEditorPhoto}
+          photoPath={frameEditorPhoto}
+          photoUrl={frameEditorUrl}
+          initial={getPhotoFraming(photoFraming, frameEditorPhoto)}
+          onClose={() => setFrameEditorPhoto(null)}
+          onSave={settings => saveFraming(frameEditorPhoto, settings)}
+        />
+      )}
     </form>
   );
 }
 
-// ── Sub-components ────────────────────────────────────────────
-
-function SquareDrop({
-  src, filename, uploading, locked, accept, onFile, inputRef, emoji, hint,
-}: {
-  src: string | null;
-  filename?: string;
-  uploading: boolean;
-  locked: boolean;
-  accept: string;
-  onFile: (f: File) => void;
-  inputRef: React.RefObject<HTMLInputElement>;
-  emoji: string;
-  hint: string;
-}) {
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault();
-    const f = e.dataTransfer.files[0];
-    if (f) onFile(f);
-  }
-  return (
-    <div
-      onClick={() => !locked && inputRef.current?.click()}
-      onDrop={handleDrop}
-      onDragOver={e => e.preventDefault()}
-      className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-colors flex flex-col items-center justify-center gap-2 p-3
-        ${locked ? 'border-neutral-800 cursor-not-allowed opacity-50'
-          : src || filename ? 'border-neutral-700 bg-neutral-900 cursor-pointer hover:border-neutral-500'
-            : 'border-dashed border-neutral-600 cursor-pointer hover:border-neutral-400 bg-neutral-900'}`}
-    >
-      {src ? (
-        <img src={src} className="absolute inset-0 w-full h-full object-cover" />
-      ) : filename ? (
-        <>
-          <div className="text-3xl">{emoji}</div>
-          <p className="text-xs text-neutral-300 font-mono text-center break-all leading-snug">{filename}</p>
-          <p className="text-[10px] text-neutral-600">Click to replace</p>
-        </>
-      ) : (
-        <>
-          <div className="text-3xl text-neutral-600">{emoji}</div>
-          <p className="text-xs text-neutral-500 text-center">Drop or click</p>
-          <p className="text-[10px] text-neutral-700">{hint}</p>
-        </>
-      )}
-      {uploading && (
-        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-          <span className="text-xs text-white animate-pulse">Uploading…</span>
-        </div>
-      )}
-      <input ref={inputRef} type="file" accept={accept} className="hidden"
-        onChange={e => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }} />
-    </div>
-  );
+function SquareDrop({ label, src, filename, uploading, locked, accept, onFile, inputRef, emoji, hint }: { label: string; src: string | null; filename?: string; uploading: boolean; locked: boolean; accept: string; onFile: (f: File) => void; inputRef: React.RefObject<HTMLInputElement>; emoji: string; hint: string; }) {
+  return <div><p className="text-xs text-neutral-500 mb-2">{label}</p><div onClick={() => !locked && inputRef.current?.click()} className={`aspect-square rounded-xl border border-neutral-700 bg-neutral-950 flex items-center justify-center text-center overflow-hidden ${locked ? 'opacity-50' : 'cursor-pointer hover:border-neutral-500'}`}>{src ? <img src={src} className="w-full h-full object-cover" /> : <div className="p-3"><div className="text-3xl mb-2">{emoji}</div><p className="text-xs text-neutral-400">{uploading ? 'Uploading…' : filename || hint}</p></div>}</div><input ref={inputRef} type="file" accept={accept} className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }} /></div>;
 }
 
-function Card({ title, action, help, children }: { title: string; action?: React.ReactNode; help?: string; children: React.ReactNode }) {
-  const [showHelp, setShowHelp] = useState(false);
-  return (
-    <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <h2 className="text-xs font-semibold text-neutral-500 uppercase tracking-widest">{title}</h2>
-          {help && (
-            <button
-              type="button"
-              onClick={() => setShowHelp(s => !s)}
-              className={`w-4 h-4 rounded-full border text-[10px] font-bold leading-none flex items-center justify-center transition-colors flex-shrink-0
-                ${showHelp ? 'bg-neutral-600 border-neutral-500 text-white' : 'border-neutral-700 text-neutral-600 hover:border-neutral-500 hover:text-neutral-400'}`}
-              title="Show help"
-            >?</button>
-          )}
-        </div>
-        {action}
-      </div>
-      {help && showHelp && (
-        <div className="mb-4 bg-neutral-800/60 border border-neutral-700 rounded-lg px-3 py-2.5 text-xs text-neutral-400 leading-relaxed">
-          {help}
-        </div>
-      )}
-      {children}
-    </div>
-  );
+function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return <button type="button" onClick={() => onChange(!checked)} className={`rounded-lg border px-3 py-2 text-xs font-bold transition-colors ${checked ? 'bg-white/10 border-white/50 text-white' : 'bg-neutral-900 border-neutral-700 text-neutral-500'}`}>{checked ? '✓ ' : ''}{label}</button>;
+}
+
+function Card({ title, help, action, children }: { title: string; help?: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return <section className="bg-neutral-900 border border-neutral-800 rounded-xl p-5"><div className="flex items-start justify-between gap-4 mb-4"><div><h2 className="text-white font-semibold">{title}</h2>{help && <p className="text-xs text-neutral-500 mt-1 leading-relaxed">{help}</p>}</div>{action}</div>{children}</section>;
 }
 
 function Label({ text, full, children }: { text: string; full?: boolean; children: React.ReactNode }) {
-  return (
-    <div className={full ? 'col-span-2' : ''}>
-      <label className="block text-xs text-neutral-500 mb-1.5">{text}</label>
-      {children}
-    </div>
-  );
+  return <label className={full ? 'col-span-2' : ''}><span className="block text-xs text-neutral-500 mb-1.5 uppercase tracking-wider font-semibold">{text}</span>{children}</label>;
 }
 
 function ModeBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button type="button" onClick={onClick}
-      className={`px-3 py-1.5 rounded text-sm font-medium transition-colors
-        ${active ? 'bg-neutral-700 text-white' : 'text-neutral-500 hover:text-neutral-200'}`}>
-      {children}
-    </button>
-  );
+  return <button type="button" onClick={onClick} className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${active ? 'bg-neutral-700 text-white' : 'text-neutral-500 hover:text-white'}`}>{children}</button>;
 }
 
-const inputClass =
-  'w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-100 ' +
-  'placeholder-neutral-600 focus:outline-none focus:border-neutral-500 transition-colors';
+const inputClass = 'w-full bg-neutral-950 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-neutral-500';
+const selectClass = `${inputClass} appearance-none`;
 
-const selectClass =
-  'w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-100 ' +
-  'focus:outline-none focus:border-neutral-500 transition-colors cursor-pointer';
