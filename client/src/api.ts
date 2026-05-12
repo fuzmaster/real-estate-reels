@@ -1,13 +1,15 @@
 import type { CampaignFormData, ListingAssets, OutputCampaign } from './types';
 
+export const API_BASE: string = import.meta.env.VITE_API_URL ?? '';
+
 export async function getProjects(): Promise<string[]> {
-  const res = await fetch('/api/projects');
+  const res = await fetch(`${API_BASE}/api/projects`);
   if (!res.ok) throw new Error('Failed to load listings');
   return res.json();
 }
 
 export async function createProject(name: string): Promise<void> {
-  const res = await fetch('/api/projects', {
+  const res = await fetch(`${API_BASE}/api/projects`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
@@ -19,19 +21,19 @@ export async function createProject(name: string): Promise<void> {
 }
 
 export async function getListingAssets(name: string): Promise<ListingAssets> {
-  const res = await fetch(`/api/projects/${encodeURIComponent(name)}/listing-assets`);
+  const res = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(name)}/listing-assets`);
   if (!res.ok) throw new Error('Failed to load listing assets');
   return res.json();
 }
 
 export function projectFileUrl(projectName: string, relPath: string): string {
-  return `/api/projects/${encodeURIComponent(projectName)}/files/${encodeURIComponent(relPath)}`;
+  return `${API_BASE}/api/projects/${encodeURIComponent(projectName)}/files/${encodeURIComponent(relPath)}`;
 }
 
 export async function uploadListingPhoto(projectName: string, file: File): Promise<string> {
   const fd = new FormData();
   fd.append('file', file);
-  const res = await fetch(`/api/projects/${encodeURIComponent(projectName)}/photos`, {
+  const res = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(projectName)}/photos`, {
     method: 'POST',
     body: fd,
   });
@@ -42,7 +44,7 @@ export async function uploadListingPhoto(projectName: string, file: File): Promi
 export async function uploadHeadshot(projectName: string, file: File): Promise<string> {
   const fd = new FormData();
   fd.append('file', file);
-  const res = await fetch(`/api/projects/${encodeURIComponent(projectName)}/headshot`, {
+  const res = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(projectName)}/headshot`, {
     method: 'POST',
     body: fd,
   });
@@ -53,7 +55,7 @@ export async function uploadHeadshot(projectName: string, file: File): Promise<s
 export async function uploadLogo(projectName: string, file: File): Promise<string> {
   const fd = new FormData();
   fd.append('file', file);
-  const res = await fetch(`/api/projects/${encodeURIComponent(projectName)}/logo`, {
+  const res = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(projectName)}/logo`, {
     method: 'POST',
     body: fd,
   });
@@ -64,7 +66,7 @@ export async function uploadLogo(projectName: string, file: File): Promise<strin
 export async function uploadMusic(projectName: string, file: File): Promise<string> {
   const fd = new FormData();
   fd.append('file', file);
-  const res = await fetch(`/api/projects/${encodeURIComponent(projectName)}/music`, {
+  const res = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(projectName)}/music`, {
     method: 'POST',
     body: fd,
   });
@@ -73,12 +75,12 @@ export async function uploadMusic(projectName: string, file: File): Promise<stri
 }
 
 export async function cancelRender(jobId: string): Promise<void> {
-  await fetch(`/api/render/${jobId}`, { method: 'DELETE' });
+  await fetch(`${API_BASE}/api/render/${jobId}`, { method: 'DELETE' });
 }
 
 export async function deleteOutputFile(slug: string, filename: string): Promise<void> {
   const res = await fetch(
-    `/api/outputs/${encodeURIComponent(slug)}/${encodeURIComponent(filename)}`,
+    `${API_BASE}/api/outputs/${encodeURIComponent(slug)}/${encodeURIComponent(filename)}`,
     { method: 'DELETE' },
   );
   if (!res.ok) {
@@ -88,7 +90,7 @@ export async function deleteOutputFile(slug: string, filename: string): Promise<
 }
 
 export async function startRender(campaign: CampaignFormData): Promise<{ jobId: string }> {
-  const res = await fetch('/api/render', {
+  const res = await fetch(`${API_BASE}/api/render`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(campaign),
@@ -98,12 +100,12 @@ export async function startRender(campaign: CampaignFormData): Promise<{ jobId: 
 }
 
 export async function getOutputs(): Promise<OutputCampaign[]> {
-  const res = await fetch('/api/outputs');
+  const res = await fetch(`${API_BASE}/api/outputs`);
   if (!res.ok) throw new Error('Failed to load outputs');
   return res.json();
 }
 
 export async function getHealth(): Promise<void> {
-  const res = await fetch('/api/health');
+  const res = await fetch(`${API_BASE}/api/health`);
   if (!res.ok) throw new Error('Server unhealthy');
 }

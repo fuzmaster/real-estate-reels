@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { deleteOutputFile, getOutputs } from '../api';
+import { API_BASE, deleteOutputFile, getOutputs } from '../api';
 import type { OutputCampaign } from '../types';
 
 function formatBytes(bytes: number): string {
@@ -113,7 +113,7 @@ export default function OutputGallery({ refreshKey = 0 }: { refreshKey?: number 
   }
 
   function openPreview(slug: string, filename: string) {
-    setPreviewUrl(`/api/outputs/${encodeURIComponent(slug)}/${encodeURIComponent(filename)}`);
+    setPreviewUrl(`${API_BASE}/api/outputs/${encodeURIComponent(slug)}/${encodeURIComponent(filename)}`);
     setPreviewName(filename.replace('.mp4', ''));
   }
 
@@ -227,7 +227,7 @@ export default function OutputGallery({ refreshKey = 0 }: { refreshKey?: number 
                     Preview
                   </button>
                   <a
-                    href={`/api/outputs/${encodeURIComponent(campaign.slug)}/${encodeURIComponent(file.name)}`}
+                    href={`${API_BASE}/api/outputs/${encodeURIComponent(campaign.slug)}/${encodeURIComponent(file.name)}`}
                     download={file.name}
                     className="text-xs text-spotify-green hover:text-green-300 flex-shrink-0 bg-spotify-green/10 hover:bg-spotify-green/20 px-3 py-1.5 rounded transition-colors"
                   >

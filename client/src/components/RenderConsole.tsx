@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { JobEntry } from '../App';
-import { cancelRender } from '../api';
+import { API_BASE, cancelRender } from '../api';
 
 function formatEta(ms: number): string {
   if (ms <= 0) return '';
@@ -126,7 +126,7 @@ export default function RenderConsole({
         [jobId]: s[jobId] ?? { status: 'connecting', logs: [], progress: null, startedAt: null },
       }));
 
-      const es = new EventSource(`/api/render/${jobId}/stream`);
+      const es = new EventSource(`${API_BASE}/api/render/${jobId}/stream`);
       esRefs.current[jobId] = es;
 
       es.onmessage = e => {
