@@ -29,6 +29,16 @@ function validateConfig() {
   if (!REMOTION_PROJECT || !fs.existsSync(REMOTION_PROJECT)) return false;
   return true;
 }
+// Auto-create the public/Projects folder when using the bundled remotion path
+if (ASSETS_ROOT && ASSETS_ROOT === BUNDLED_ASSETS && !fs.existsSync(ASSETS_ROOT)) {
+  try {
+    fs.mkdirSync(path.join(ASSETS_ROOT, 'Projects'), { recursive: true });
+    console.log(`Created default assets folder: ${ASSETS_ROOT}`);
+  } catch (e) {
+    console.warn(`Could not auto-create assets folder: ${e.message}`);
+  }
+}
+
 let configValid = validateConfig();
 
 if (!configValid) {
