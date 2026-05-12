@@ -6,8 +6,7 @@ export default function Landing() {
       <nav className="border-b border-neutral-800 bg-neutral-900/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold tracking-tight text-white">REAL ESTATE</span>
-            <span className="text-lg font-bold tracking-tight text-neutral-400">REELS</span>
+            <img src="/logo-wordmark.png" alt="Real Estate Reels" className="h-8 w-auto" />
           </div>
           <div className="flex items-center gap-3">
             <a href="#pricing" className="text-sm text-neutral-400 hover:text-white transition-colors hidden sm:block">Pricing</a>
@@ -50,6 +49,15 @@ export default function Landing() {
           </a>
         </div>
         <p className="text-neutral-600 text-xs mt-6">No account required to start. 3 free renders per month.</p>
+
+        {/* Hero image */}
+        <div className="mt-16 rounded-2xl overflow-hidden border border-neutral-800 shadow-2xl">
+          <img
+            src="/og-image.png"
+            alt="Real Estate Reels — Just Listed, Open House, and Just Sold video templates on phone mockups"
+            className="w-full"
+          />
+        </div>
       </section>
 
       {/* Social proof bar */}
@@ -105,32 +113,37 @@ export default function Landing() {
             {[
               {
                 label: 'Just Listed',
-                accent: '#FFFFFF',
                 badge: 'bg-white text-black',
+                src: '/template-just-listed.png',
                 description: 'Launch a new listing with a hook slide, hero photo, property stats, and your agent CTA.',
                 keywords: 'Perfect for new listings, price reductions, and back-on-market announcements.',
               },
               {
                 label: 'Open House',
-                accent: '#9DC8FF',
-                badge: 'bg-blue-400 text-black',
+                badge: 'bg-blue-300 text-black',
+                src: '/template-open-house.png',
                 description: 'Promote your open house with date, time, and property highlights front and center.',
                 keywords: 'Ideal for weekend open houses, broker tours, and virtual showing announcements.',
               },
               {
                 label: 'Just Sold',
-                accent: '#FFD27A',
                 badge: 'bg-yellow-300 text-black',
+                src: '/template-just-sold.png',
                 description: 'Celebrate a closed deal, reinforce your market presence, and generate referral leads.',
                 keywords: 'Great for seller testimonials, neighborhood sold reports, and agent farming.',
               },
-            ].map(({ label, badge, description, keywords }) => (
-              <div key={label} className="bg-neutral-900 border border-neutral-800 rounded-2xl p-7 flex flex-col gap-4">
-                <span className={`self-start text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider ${badge}`}>
-                  {label}
-                </span>
-                <p className="text-neutral-300 text-sm leading-relaxed">{description}</p>
-                <p className="text-neutral-600 text-xs leading-relaxed">{keywords}</p>
+            ].map(({ label, badge, src, description, keywords }) => (
+              <div key={label} className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden flex flex-col">
+                <div className="relative">
+                  <img src={src} alt={`${label} real estate reel template`} className="w-full object-cover aspect-[9/16]" />
+                  <span className={`absolute top-3 left-3 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider ${badge}`}>
+                    {label}
+                  </span>
+                </div>
+                <div className="p-5 flex flex-col gap-2">
+                  <p className="text-neutral-300 text-sm leading-relaxed">{description}</p>
+                  <p className="text-neutral-600 text-xs leading-relaxed">{keywords}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -291,9 +304,9 @@ export default function Landing() {
       {/* Footer */}
       <footer className="border-t border-neutral-800 py-10 px-6">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-neutral-600 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-neutral-400">REAL ESTATE REELS</span>
-            <span>— listing videos for agents, built with Remotion</span>
+          <div className="flex items-center gap-3">
+            <img src="/logo-mark.png" alt="Real Estate Reels" className="h-6 w-auto opacity-60" />
+            <span>listing videos for agents, built with Remotion</span>
           </div>
           <div className="flex gap-6">
             <a href="/app" className="hover:text-neutral-400 transition-colors">Launch App</a>
