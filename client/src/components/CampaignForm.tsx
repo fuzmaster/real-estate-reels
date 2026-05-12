@@ -65,9 +65,11 @@ const DEFAULT_SAMPLE = {
 export default function CampaignForm({
   onRenderStarted,
   onAddToQueue,
+  serverOk,
 }: {
   onRenderStarted: (jobId: string, label: string, payload: CampaignFormData) => void;
   onAddToQueue: (campaign: CampaignFormData) => void;
+  serverOk: boolean | null;
 }) {
   // Listing folder selection
   const [mode, setMode] = useState<'existing' | 'new'>('new');
@@ -135,7 +137,9 @@ export default function CampaignForm({
 
   // Load listing list on mount
   useEffect(() => {
-    getProjects().then(setProjects).catch(() => setError('Could not load listings. Is the server running?'));
+    getProjects().then(setProjects).catch(() => {
+      if (serverOk !== false) setError('Could not load listings. Is the server running?');
+    });
   }, []);
 
   // When an existing listing is selected, load its assets

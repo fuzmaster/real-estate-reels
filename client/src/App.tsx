@@ -142,11 +142,26 @@ export default function App() {
 
       {/* Main content */}
       <main className="flex-1 max-w-4xl mx-auto w-full px-6 py-8">
+        {serverOk === false && (
+          <div className="mb-6 bg-yellow-950/60 border border-yellow-800/60 rounded-xl px-5 py-4 flex gap-4 items-start">
+            <span className="text-yellow-400 text-xl flex-shrink-0 mt-0.5">⚠</span>
+            <div>
+              <p className="text-yellow-200 font-semibold text-sm mb-1">Local server not running</p>
+              <p className="text-yellow-400/80 text-xs leading-relaxed">
+                Rendering requires the local Express server. Open a terminal in the project folder and run{' '}
+                <code className="bg-yellow-900/60 px-1.5 py-0.5 rounded font-mono">node server.js</code>,
+                then set <code className="bg-yellow-900/60 px-1.5 py-0.5 rounded font-mono">VITE_API_URL</code> in
+                Vercel to your machine's IP. The form is still editable for reference.
+              </p>
+            </div>
+          </div>
+        )}
         {/* CampaignForm stays mounted so form state survives tab switches */}
         <div style={{ display: view === 'form' ? undefined : 'none' }}>
           <CampaignForm
             onRenderStarted={(jobId, label, payload) => handleRenderStarted(jobId, label, payload)}
             onAddToQueue={addToQueue}
+            serverOk={serverOk}
           />
         </div>
         {view === 'queue' && (
