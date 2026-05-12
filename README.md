@@ -1,53 +1,45 @@
-# Real Estate Reels Web
+# Real Estate Reels
 
-Real Estate Reels Web is a local video production app built for real estate agents, brokers, and marketing teams who need to create consistent short-form listing videos quickly.
+Create branded short-form listing videos for Instagram Reels, TikTok, and YouTube Shorts in minutes — without a video editor.
 
-It provides a browser-based workflow to upload listing media, write on-screen copy, choose reel formats, queue multiple campaigns, and render polished MP4 files from one dashboard.
+## Who it's for
 
-## Who this is for
-
-- Individual agents who need fast social content for new listings
+- Real estate agents who need fast social content for new listings
 - Brokerage marketing teams producing reels at scale
-- Agent support staff and coordinators handling repeat campaign workflows
+- Agent coordinators handling repeat listing video workflows
 
-## What the project does
+## What it does
 
-- Creates short-form real estate video reels from photos, music, logo, and agent branding
-- Supports multiple reel styles (V1 Driving, V2 Artwork, V3 Anytime)
-- Lets you generate multiple outputs from different audio start times in one run
-- Includes batch queueing so you can prepare many campaigns and render all at once
-- Provides live render status, logs, retry actions, and output previews/downloads
-
-## Why it is useful for brokers and agents
-
-- Speeds up listing marketing by turning a repeat process into a guided form
-- Improves brand consistency with reusable templates and standardized layouts
-- Reduces editing bottlenecks by automating render jobs instead of manual timeline work
-- Makes team handoff easier with export/import of campaign settings
-- Keeps work local on your machine for straightforward control of media and outputs
+- Generates polished 1080×1920 MP4 videos from listing photos, agent headshot, and brokerage logo
+- Three templates: **Just Listed**, **Open House**, and **Just Sold**
+- Ken Burns zoom on listing photos, animated stats card, agent CTA outro
+- Batch queue — prepare many listings and render all at once
+- Live render progress, output gallery with preview and download
 
 ## Typical workflow
 
-1. Create or select a listing project.
-2. Upload media assets (photos, headshot, logo, music, optional stock footage).
-3. Enter campaign copy and artist text, then pick reel types and timing.
-4. Preview scenes in the app.
-5. Render immediately or add multiple campaigns to the batch queue.
-6. Monitor progress in Jobs and download final MP4s from Outputs.
+1. Create a listing project and upload your photos, headshot, and logo
+2. Fill in the listing details — address, price, beds, baths, agent info, CTA
+3. Choose Just Listed, Open House, or Just Sold
+4. Render and download the MP4
 
-## Key capabilities included
+## Tech stack
 
-- Browser UI with live preview
-- Listing asset management by project
-- Queue-based rendering for multi-campaign runs
-- Job tracking with progress, ETA, and retry on failure
-- Output gallery with inline preview, download, and bulk delete
-- Bundled Remotion compositions for automated high-quality rendering
+- **Frontend**: React + Vite + TypeScript + TailwindCSS
+- **Backend**: Node.js + Express + Multer
+- **Video rendering**: [Remotion](https://remotion.dev) (requires local server)
+- **Deployment**: Vercel (UI) — rendering requires the local server
 
-## Delivery formats
+## Local development
 
-Rendered outputs are exported as MP4 files, with naming that identifies reel type and part index (for multiple audio start points).
+```bash
+npm install
+npm install --prefix client
+npm run dev
+```
 
-## Positioning summary
+The app runs at `http://localhost:5173`, the API server at `http://localhost:3000`.
 
-Real Estate Reels Web is a local, repeatable reel production system for real estate teams that want to publish more listing content, faster, without rebuilding every video from scratch.
+## Rendering
+
+Rendering requires the local Express server (`node server.js`) plus Remotion and FFmpeg installed. The Vercel deployment hosts the UI only — all video processing happens on your machine.
