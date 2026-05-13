@@ -60,6 +60,8 @@ export interface ListingReelProps {
   openHouseTime: string;
   shortDescription: string;
   neighborhood: string;
+  mlsLink?: string;
+  qrCodeDataUrl?: string;
   videoStyle?: VideoStyle;
   pacing?: PacingPreset;
   musicMood?: MusicMood;
@@ -285,6 +287,8 @@ export const ListingReel: React.FC<ListingReelProps> = (props) => {
     openHouseDate,
     openHouseTime,
     shortDescription,
+    mlsLink,
+    qrCodeDataUrl,
     videoStyle = 'social-punchy',
     pacing = 'fast',
     photoTransition = 'smart-mix',
@@ -479,6 +483,17 @@ export const ListingReel: React.FC<ListingReelProps> = (props) => {
               {ctaText || 'DM "TOUR" FOR DETAILS'}
             </div>
           </SpringIn>
+          {qrCodeDataUrl && mlsLink && (
+            <SpringIn from={20}>
+              <div style={{ marginTop: 18, display: 'flex', alignItems: 'center', gap: 16, width: 'fit-content', padding: '12px 16px', borderRadius: 18, background: 'rgba(255,255,255,0.96)', boxShadow: '0 18px 46px rgba(0,0,0,0.42)' }}>
+                <Img src={qrCodeDataUrl} style={{ width: 92, height: 92 }} />
+                <div style={{ color: '#050505' }}>
+                  <div style={{ fontSize: 18, fontWeight: 950, textTransform: 'uppercase' }}>Scan for listing</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, maxWidth: 360, lineHeight: 1.15, marginTop: 4 }}>Open the full property page</div>
+                </div>
+              </div>
+            </SpringIn>
+          )}
         </AbsoluteFill>
       </Sequence>
 

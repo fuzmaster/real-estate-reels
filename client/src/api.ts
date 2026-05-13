@@ -1,4 +1,4 @@
-import type { CampaignFormData, ListingAssets, OutputCampaign } from './types';
+import type { BrandLibrary, CampaignFormData, ListingAssets, OutputCampaign, ProjectSummary } from './types';
 
 export const API_BASE: string = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
 
@@ -23,6 +23,77 @@ export async function createProject(name: string): Promise<void> {
 export async function getListingAssets(name: string): Promise<ListingAssets> {
   const res = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(name)}/listing-assets`);
   if (!res.ok) throw new Error('Failed to load listing assets');
+  return res.json();
+}
+
+export async function getProjectSummaries(): Promise<ProjectSummary[]> {
+  const res = await fetch(`${API_BASE}/api/project-summaries`);
+  if (!res.ok) throw new Error('Failed to load project dashboard');
+  return res.json();
+}
+
+export async function duplicateProject(name: string, copyName: string): Promise<{ name: string }> {
+  const res = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(name)}/duplicate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: copyName }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to duplicate project');
+  }
+  return res.json();
+}
+
+export async function importProjectZip(file: File): Promise<{ name: string }> {
+  const fd = new FormData();
+  fd.append('file', file);
+  const res = await fetch(`${API_BASE}/api/projects/import`, { method: 'POST', body: fd });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to import project');
+  }
+  return res.json();
+}
+
+export function exportProjectUrl(name: string): string {
+  return `${API_BASE}/api/projects/${encodeURIComponent(name)}/export`;
+}
+
+export async function getBrandLibrary(): Promise<BrandLibrary> {
+  const res = await fetch(`${API_BASE}/api/brand-library`);
+  if (!res.ok) throw new Error('Failed to load brand library');
+  return res.json();
+}
+
+export function brandAssetUrl(kind: keyof BrandLibrary, file: string): string {
+  return `${API_BASE}/api/brand-library/${encodeURIComponent(kind)}/${encodeURIComponent(file)}`;
+}
+
+export async function uploadBrandAsset(kind: keyof BrandLibrary, file: File): Promise<{ file: string; label: string }> {
+  const fd = new FormData();
+  fd.append('file', file);
+  const res = await fetch(`${API_BASE}/api/brand-library/${encodeURIComponent(kind)}`, {
+    method: 'POST',
+    body: fd,
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to upload brand asset');
+  }
+  return res.json();
+}
+
+export async function useBrandAsset(projectName: string, kind: keyof BrandLibrary, file: string): Promise<{ file: string }> {
+  const res = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(projectName)}/use-brand-asset`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind, file }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to attach brand asset');
+  }
   return res.json();
 }
 

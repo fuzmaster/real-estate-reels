@@ -107,9 +107,12 @@ export const OPEN_HOUSE_TIME  = "";
 export const SHORT_DESCRIPTION = "A bright move-in ready home with flexible living space.";
 export const NEIGHBORHOOD     = "Windsor Center";
 export const MLS_LINK         = "";
+export const QR_CODE_DATA_URL = "";
 
 export const CLIP_DURATION_SECONDS = 19;
 export const PHOTO_TRANSITION = "smart-mix";
+export const VIDEO_STYLE = "social-punchy" as 'social-punchy' | 'luxury-cinematic' | 'brokerage-clean';
+export const MUSIC_MOOD = "warm-inviting" as 'warm-inviting' | 'modern-lofi' | 'luxury-cinematic' | 'upbeat-open-house' | 'corporate-professional' | 'urgent-driving' | 'high-energy-social';
 
 
 export const PACING = "fast" as 'fast' | 'balanced' | 'cinematic';
@@ -117,4 +120,3 @@ export const AUTO_ENHANCE = true;
 export const SMART_SAFE_ZONES = true;
 export const PERSISTENT_BRANDING = true;
 export const PROGRESS_BAR = true;
-

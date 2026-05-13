@@ -42,6 +42,19 @@ export interface ListingAssets {
   music: string | null;    // relative path under Music/, or null
 }
 
+export interface ProjectSummary {
+  name: string;
+  photos: number;
+  outputs: number;
+  updatedAt: string;
+}
+
+export interface BrandLibrary {
+  headshots: Array<{ file: string; label: string }>;
+  logos: Array<{ file: string; label: string }>;
+  music: Array<{ file: string; label: string }>;
+}
+
 export interface CampaignFormData {
   // Folder under Projects/ on disk. Keeps server contract.
   folder: string;
@@ -114,5 +127,11 @@ export interface OutputFile {
 export interface OutputCampaign {
   slug: string;
   files: OutputFile[];
+  package?: {
+    propertyLabel: string;
+    caption: string;
+    postingTitle: string;
+    hashtags: string[];
+    mlsLink?: string;
+  };
 }
-

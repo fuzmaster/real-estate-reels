@@ -6,10 +6,11 @@ import OutputGallery from './components/OutputGallery';
 import BatchQueue from './components/BatchQueue';
 import Help from './components/Help';
 import Settings from './components/Settings';
+import ProjectDashboard from './components/ProjectDashboard';
 import { loadPrefs } from './components/Settings';
 import type { CampaignFormData } from './types';
 
-type View = 'form' | 'queue' | 'console' | 'outputs' | 'help' | 'settings';
+type View = 'dashboard' | 'form' | 'queue' | 'console' | 'outputs' | 'help' | 'settings';
 
 export interface JobEntry {
   jobId: string;
@@ -24,11 +25,13 @@ function loadJobs(): JobEntry[] {
 }
 
 export default function App() {
-  const [view, setView] = useState<View>('form');
+  const [view, setView] = useState<View>('dashboard');
   const [queue, setQueue] = useState<CampaignFormData[]>([]);
   const [jobs, setJobs] = useState<JobEntry[]>(loadJobs);
   const [outputsVersion, setOutputsVersion] = useState(0);
   const [serverOk, setServerOk] = useState<boolean | null>(null);
+  const [projectToOpen, setProjectToOpen] = useState('');
+  const [dashboardVersion, setDashboardVersion] = useState(0);
 
   useEffect(() => {
     sessionStorage.setItem(JOBS_KEY, JSON.stringify(jobs));
@@ -63,6 +66,11 @@ export default function App() {
   function handleRenderStarted(jobId: string, label: string, payload?: CampaignFormData) {
     setJobs(j => [...j, { jobId, label, payload }]);
     if (loadPrefs().autoSwitchToJobs) setView('console');
+  }
+
+  function openProjectFromDashboard(name: string) {
+    setProjectToOpen(name);
+    setView('form');
   }
 
   async function retryJob(original: JobEntry) {
@@ -105,6 +113,9 @@ export default function App() {
             />
           </div>
           <nav className="flex gap-1">
+            <NavBtn active={view === 'dashboard'} onClick={() => setView('dashboard')}>
+              Dashboard
+            </NavBtn>
             <NavBtn active={view === 'form'} onClick={() => setView('form')}>
               1. Build
             </NavBtn>
@@ -156,12 +167,21 @@ export default function App() {
             </div>
           </div>
         )}
+        {view === 'dashboard' && (
+          <ProjectDashboard
+            refreshKey={dashboardVersion}
+            onOpenProject={openProjectFromDashboard}
+          />
+        )}
         {/* CampaignForm stays mounted so form state survives tab switches */}
         <div style={{ display: view === 'form' ? undefined : 'none' }}>
           <CampaignForm
             onRenderStarted={(jobId, label, payload) => handleRenderStarted(jobId, label, payload)}
             onAddToQueue={addToQueue}
             serverOk={serverOk}
+            projectToOpen={projectToOpen}
+            onProjectOpened={() => setProjectToOpen('')}
+            onProjectChanged={() => setDashboardVersion(v => v + 1)}
           />
         </div>
         {view === 'queue' && (

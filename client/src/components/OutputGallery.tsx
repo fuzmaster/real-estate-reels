@@ -24,6 +24,11 @@ function reelVersion(filename: string): { label: string; color: string } {
 }
 
 type SortKey = 'date' | 'name' | 'size';
+const FAVORITES_KEY = 'rer-output-favorites-v1';
+
+function loadFavorites(): Set<string> {
+  try { return new Set(JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]')); } catch { return new Set(); }
+}
 
 function sortFiles(files: OutputCampaign['files'], key: SortKey) {
   return [...files].sort((a, b) => {
@@ -44,6 +49,8 @@ export default function OutputGallery({ refreshKey = 0 }: { refreshKey?: number 
   const [selected, setSelected] = useState<Set<string>>(new Set()); // "slug/file" keys
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('date');
+  const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
+  const [favorites, setFavorites] = useState<Set<string>>(loadFavorites);
 
   function loadOutputs() {
     setLoading(true);
@@ -115,6 +122,41 @@ export default function OutputGallery({ refreshKey = 0 }: { refreshKey?: number 
   function openPreview(slug: string, filename: string) {
     setPreviewUrl(`${API_BASE}/api/outputs/${encodeURIComponent(slug)}/${encodeURIComponent(filename)}`);
     setPreviewName(filename.replace('.mp4', ''));
+  }
+
+  async function copyPostingPackage(slug: string, caption?: string, hashtags?: string[]) {
+    const text = [caption, hashtags?.join(' ')].filter(Boolean).join('\n\n');
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    setCopiedSlug(slug);
+    setTimeout(() => setCopiedSlug(null), 1800);
+  }
+
+  function toggleFavorite(key: string) {
+    setFavorites(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      localStorage.setItem(FAVORITES_KEY, JSON.stringify(Array.from(next)));
+      return next;
+    });
+  }
+
+  function downloadPostingKit(slug: string, title?: string, caption?: string, hashtags?: string[], mlsLink?: string) {
+    const content = [
+      title ? `Title: ${title}` : '',
+      '',
+      caption || '',
+      '',
+      hashtags?.join(' ') || '',
+      mlsLink ? `\nListing URL: ${mlsLink}` : '',
+    ].join('\n');
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${slug}-posting-kit.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   if (loading) {
@@ -199,11 +241,47 @@ export default function OutputGallery({ refreshKey = 0 }: { refreshKey?: number 
             />
             <h2 className="font-semibold text-white text-sm flex-1">{campaign.slug.replace(/_/g, ' ')}</h2>
           </div>
+          {campaign.package && (
+            <div className="border-b border-neutral-800 bg-neutral-950/70 px-5 py-4 grid gap-3 lg:grid-cols-[1fr_auto]">
+              <div>
+                <div className="text-[11px] uppercase tracking-widest text-neutral-500">Posting Package</div>
+                <div className="text-sm text-white font-semibold mt-1">{campaign.package.postingTitle}</div>
+                <p className="text-sm text-neutral-400 mt-2 leading-relaxed">{campaign.package.caption}</p>
+                <p className="text-xs text-neutral-500 mt-2">{campaign.package.hashtags.join(' ')}</p>
+              </div>
+              <div className="flex flex-col gap-2 items-start lg:items-end">
+                <button
+                  onClick={() => copyPostingPackage(campaign.slug, campaign.package?.caption, campaign.package?.hashtags)}
+                  className="text-xs bg-white hover:bg-neutral-200 text-black font-bold px-3 py-2"
+                >
+                  {copiedSlug === campaign.slug ? 'Copied' : 'Copy Caption'}
+                </button>
+                <button
+                  onClick={() => downloadPostingKit(
+                    campaign.slug,
+                    campaign.package?.postingTitle,
+                    campaign.package?.caption,
+                    campaign.package?.hashtags,
+                    campaign.package?.mlsLink,
+                  )}
+                  className="text-xs border border-neutral-700 bg-neutral-800 hover:bg-neutral-700 text-white font-bold px-3 py-2"
+                >
+                  Download Kit
+                </button>
+                {campaign.package.mlsLink && (
+                  <span className="text-[11px] text-emerald-300 border border-emerald-900 bg-emerald-950/40 px-2 py-1">
+                    QR enabled
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
           <div className="divide-y divide-neutral-800">
             {sortedFiles.map(file => {
               const { label, color } = reelVersion(file.name);
               const fileKey = `${campaign.slug}/${file.name}`;
               const isSelected = selected.has(fileKey);
+              const versionLabel = sortedFiles.length > 1 ? `v${sortedFiles.length - sortedFiles.findIndex(item => item.name === file.name)}` : 'Final';
               return (
                 <div key={file.name} className={`flex items-center gap-4 px-5 py-3 transition-colors ${isSelected ? 'bg-neutral-800/60' : 'hover:bg-neutral-800/40'}`}>
                   <input
@@ -215,9 +293,19 @@ export default function OutputGallery({ refreshKey = 0 }: { refreshKey?: number 
                   <span className={`text-xs px-2 py-0.5 rounded border font-medium flex-shrink-0 ${color}`}>
                     {label}
                   </span>
+                  <span className="text-[11px] px-2 py-0.5 border border-neutral-700 bg-neutral-950 text-neutral-400 flex-shrink-0">
+                    {versionLabel}
+                  </span>
                   <span className="flex-1 text-sm text-neutral-300 font-mono truncate" title={file.name}>
                     {file.name}
                   </span>
+                  <button
+                    onClick={() => toggleFavorite(fileKey)}
+                    title={favorites.has(fileKey) ? 'Remove favorite' : 'Favorite output'}
+                    className={`text-sm flex-shrink-0 px-2 py-1 border ${favorites.has(fileKey) ? 'border-yellow-500 text-yellow-300 bg-yellow-950/40' : 'border-neutral-700 text-neutral-500 bg-neutral-950 hover:text-white'}`}
+                  >
+                    {favorites.has(fileKey) ? '★' : '☆'}
+                  </button>
                   <span className="text-xs text-neutral-600 flex-shrink-0">{formatBytes(file.size)}</span>
                   <span className="text-xs text-neutral-600 flex-shrink-0 hidden sm:block">{formatDate(file.mtime)}</span>
                   <button

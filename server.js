@@ -6,6 +6,8 @@ const os = require('os');
 const { spawn } = require('child_process');
 const { EventEmitter } = require('events');
 const multer = require('multer');
+const QRCode = require('qrcode');
+const AdmZip = require('adm-zip');
 
 const upload = multer({
   dest: os.tmpdir(),
@@ -23,6 +25,7 @@ const DEFAULT_DATA_ROOT = process.env.DATA_ROOT || process.env.PERSISTENT_ROOT |
 let ASSETS_ROOT = process.env.ASSETS_ROOT || (process.env.NODE_ENV === 'production' ? path.join(DEFAULT_DATA_ROOT, 'assets') : BUNDLED_ASSETS);
 let REMOTION_PROJECT = process.env.REMOTION_PROJECT || BUNDLED_REMOTION;
 let OUTPUT_ROOT = process.env.OUTPUT_ROOT || (process.env.NODE_ENV === 'production' ? path.join(DEFAULT_DATA_ROOT, 'outputs') : path.join(REMOTION_PROJECT, 'out'));
+let BRAND_ROOT = path.join(ASSETS_ROOT, 'BrandLibrary');
 
 app.set('trust proxy', 1);
 
@@ -56,6 +59,7 @@ function validateConfig() {
     fs.mkdirSync(ASSETS_ROOT, { recursive: true });
     fs.mkdirSync(path.join(ASSETS_ROOT, 'Projects'), { recursive: true });
     fs.mkdirSync(OUTPUT_ROOT, { recursive: true });
+    fs.mkdirSync(BRAND_ROOT, { recursive: true });
     fs.mkdirSync(path.join(REMOTION_PROJECT, 'public', 'Projects'), { recursive: true });
     return true;
   } catch (e) {
@@ -154,6 +158,7 @@ app.post('/api/setup/save', (req, res) => {
   }
   ASSETS_ROOT = assetsRoot;
   REMOTION_PROJECT = remotionProject;
+  BRAND_ROOT = path.join(ASSETS_ROOT, 'BrandLibrary');
   process.env.ASSETS_ROOT = assetsRoot;
   process.env.REMOTION_PROJECT = remotionProject;
   configValid = validateConfig();
@@ -189,6 +194,14 @@ function safeSegment(value, fallback = 'listing') {
 
 function listingDir(name) {
   return path.join(ASSETS_ROOT, 'Projects', safeSegment(name));
+}
+
+function brandDir(kind) {
+  return path.join(BRAND_ROOT, safeSegment(kind, 'misc'));
+}
+
+function safeFileStem(value, fallback = 'asset') {
+  return safeSegment(value, fallback).replace(/\s+/g, '-');
 }
 
 function readFirstImage(dir) {
@@ -227,6 +240,166 @@ app.get('/api/projects', requireConfig, (req, res) => {
     res.json(folders);
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// ── PROJECT DASHBOARD SUMMARIES ───────────────────────────────
+app.get('/api/project-summaries', requireConfig, (req, res) => {
+  const projectsDir = path.join(ASSETS_ROOT, 'Projects');
+  try {
+    if (!fs.existsSync(projectsDir)) return res.json([]);
+    const summaries = fs.readdirSync(projectsDir, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => {
+        const dir = listingDir(d.name);
+        const photosDir = path.join(dir, PHOTOS_DIR);
+        const outputsDir = path.join(OUTPUT_ROOT, safeSegment(d.name).replace(/[^a-zA-Z0-9_-]/g, '_'));
+        const stats = fs.statSync(dir);
+        return {
+          name: d.name,
+          photos: fs.existsSync(photosDir) ? fs.readdirSync(photosDir).filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f)).length : 0,
+          outputs: fs.existsSync(outputsDir) ? fs.readdirSync(outputsDir).filter(f => f.endsWith('.mp4')).length : 0,
+          updatedAt: stats.mtime,
+        };
+      })
+      .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+    res.json(summaries);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── DUPLICATE PROJECT ─────────────────────────────────────────
+app.post('/api/projects/:name/duplicate', requireConfig, async (req, res) => {
+  const source = listingDir(req.params.name);
+  if (!fs.existsSync(source)) return res.status(404).json({ error: 'Listing not found' });
+  const requested = safeSegment(req.body?.name || `${req.params.name} Copy`);
+  const dest = listingDir(requested);
+  if (fs.existsSync(dest)) return res.status(409).json({ error: 'Project already exists' });
+  try {
+    await fs.promises.cp(source, dest, { recursive: true });
+    res.json({ name: requested });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── BRAND LIBRARY ─────────────────────────────────────────────
+app.get('/api/brand-library', requireConfig, (req, res) => {
+  try {
+    const kinds = ['headshots', 'logos', 'music'];
+    const result = Object.fromEntries(kinds.map(kind => {
+      const dir = brandDir(kind);
+      fs.mkdirSync(dir, { recursive: true });
+      return [kind, fs.readdirSync(dir).map(file => ({
+        file,
+        label: path.basename(file, path.extname(file)).replace(/[-_]+/g, ' '),
+      }))];
+    }));
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/brand-library/:kind/:file', requireConfig, (req, res) => {
+  const dir = brandDir(req.params.kind);
+  const full = path.join(dir, path.basename(req.params.file));
+  if (!fs.existsSync(full)) return res.status(404).send('Not found');
+  res.sendFile(full);
+});
+
+app.post('/api/brand-library/:kind', requireConfig, upload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  const kind = safeSegment(req.params.kind, 'misc');
+  const allowed = {
+    headshots: /image/i,
+    logos: /image/i,
+    music: /audio/i,
+  };
+  if (!allowed[kind] || !allowed[kind].test(req.file.mimetype || '')) {
+    if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    return res.status(400).json({ error: 'Unsupported brand asset type' });
+  }
+  const dir = brandDir(kind);
+  fs.mkdirSync(dir, { recursive: true });
+  const ext = path.extname(req.file.originalname || '') || (kind === 'music' ? '.mp3' : '.png');
+  const stem = safeFileStem(path.basename(req.file.originalname || 'asset', ext), 'asset');
+  let target = `${stem}${ext}`;
+  let n = 1;
+  while (fs.existsSync(path.join(dir, target))) {
+    target = `${stem}-${n}${ext}`;
+    n++;
+  }
+  try {
+    fs.copyFileSync(req.file.path, path.join(dir, target));
+    fs.unlinkSync(req.file.path);
+    res.json({ file: target, label: stem.replace(/[-_]+/g, ' ') });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/projects/:name/use-brand-asset', requireConfig, (req, res) => {
+  const { kind, file } = req.body || {};
+  const kindMap = { headshots: HEADSHOT_DIR, logos: LOGO_DIR, music: MUSIC_DIR };
+  const destFolder = kindMap[kind];
+  if (!destFolder || !file) return res.status(400).json({ error: 'Brand asset required' });
+  const source = path.join(brandDir(kind), path.basename(file));
+  if (!fs.existsSync(source)) return res.status(404).json({ error: 'Brand asset not found' });
+  const projectAssetDir = path.join(listingDir(req.params.name), destFolder);
+  fs.mkdirSync(projectAssetDir, { recursive: true });
+  const ext = path.extname(source);
+  const basename = kind === 'headshots' ? 'headshot' : kind === 'logos' ? 'logo' : 'music';
+  const target = path.join(projectAssetDir, `${basename}${ext}`);
+  try {
+    fs.readdirSync(projectAssetDir).forEach(f => fs.unlinkSync(path.join(projectAssetDir, f)));
+    fs.copyFileSync(source, target);
+    res.json({ file: `${destFolder}/${path.basename(target)}` });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── PROJECT EXPORT / IMPORT ───────────────────────────────────
+app.get('/api/projects/:name/export', requireConfig, (req, res) => {
+  const dir = listingDir(req.params.name);
+  if (!fs.existsSync(dir)) return res.status(404).json({ error: 'Listing not found' });
+  try {
+    const zip = new AdmZip();
+    zip.addLocalFolder(dir, safeSegment(req.params.name));
+    const filename = `${safeSegment(req.params.name).replace(/\s+/g, '-')}.zip`;
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(zip.toBuffer());
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/projects/import', requireConfig, upload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'ZIP file required' });
+  try {
+    const zip = new AdmZip(req.file.path);
+    const entries = zip.getEntries().filter(entry => !entry.isDirectory);
+    if (entries.length === 0) throw new Error('ZIP is empty');
+    const top = safeSegment(entries[0].entryName.split(/[\\/]/)[0], 'Imported Listing');
+    const destRoot = listingDir(top);
+    if (fs.existsSync(destRoot)) return res.status(409).json({ error: 'Project already exists' });
+    fs.mkdirSync(destRoot, { recursive: true });
+    for (const entry of entries) {
+      const parts = entry.entryName.split(/[\\/]/).slice(1).filter(Boolean);
+      if (parts.length === 0) continue;
+      const target = path.resolve(destRoot, ...parts);
+      if (!target.startsWith(path.resolve(destRoot))) throw new Error('Invalid ZIP path');
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, entry.getData());
+    }
+    res.json({ name: top });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  } finally {
+    try { if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path); } catch {}
   }
 });
 
@@ -409,7 +582,12 @@ app.get('/api/outputs', requireConfig, (req, res) => {
             return { name: f, size: stat.size, mtime: stat.mtime };
           })
           .sort((a, b) => new Date(b.mtime) - new Date(a.mtime));
-        return { slug: d.name, files };
+        let packageData = null;
+        const packagePath = path.join(dir, 'posting-package.json');
+        if (fs.existsSync(packagePath)) {
+          try { packageData = JSON.parse(fs.readFileSync(packagePath, 'utf8')); } catch {}
+        }
+        return { slug: d.name, files, package: packageData || undefined };
       })
       .filter(c => c.files.length > 0)
       .sort((a, b) => new Date(b.files[0].mtime) - new Date(a.files[0].mtime));
@@ -621,7 +799,10 @@ async function runRender(jobId, campaign, emitter) {
     throw new Error('No listing photos found — upload at least one image before rendering.');
   }
 
-  writeConfig(campaign, photos, CONFIG_FILE);
+  const qrCodeDataUrl = campaign.mlsLink
+    ? await QRCode.toDataURL(String(campaign.mlsLink), { margin: 1, width: 220 })
+    : '';
+  writeConfig(campaign, photos, CONFIG_FILE, qrCodeDataUrl);
   log(`Wrote campaign.config.ts`);
 
   const slug = safeSegment(campaign.folder).replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -659,6 +840,9 @@ async function runRender(jobId, campaign, emitter) {
 
     log(`✅  Done: ${friendlyName}.mp4`);
   }
+
+  writePostingPackage(outDir, campaign);
+  log(`Prepared posting package metadata.`);
 
   if (!sameDir) {
     try {
@@ -703,11 +887,19 @@ function normalizePhotoTransition(value) {
   return aliases[raw] || 'smart-mix';
 }
 
-function writeConfig(campaign, photos, configFile) {
+function writeConfig(campaign, photos, configFile, qrCodeDataUrl = '') {
   const photosTs = photos.map(p => `  ${JSON.stringify(p)},`).join('\n');
   const duration = Number(campaign.duration) > 0 ? Math.round(Number(campaign.duration)) : 15;
-const cleanPhotoSettings = Array.isArray(campaign.photoSettings)
+const submittedPhotoSettings = Array.isArray(campaign.photoSettings)
     ? campaign.photoSettings
+    : Object.entries(campaign.photoFraming || {}).map(([path, settings]) => ({
+        path,
+        mode: settings?.cropMode === 'whole' ? 'show-whole-room' : 'fill',
+        focusX: Number.isFinite(Number(settings?.x)) ? 50 + Number(settings.x) : 50,
+        focusY: Number.isFinite(Number(settings?.y)) ? 50 + Number(settings.y) : 50,
+      }));
+const cleanPhotoSettings = submittedPhotoSettings.length > 0
+    ? submittedPhotoSettings
         .filter(s => s && s.path)
         .map(s => ({
           path: String(s.path),
@@ -786,20 +978,41 @@ export const OPEN_HOUSE_TIME  = ${tsString(campaign.openHouseTime)};
 export const SHORT_DESCRIPTION = ${tsString(campaign.shortDescription)};
 export const NEIGHBORHOOD     = ${tsString(campaign.neighborhood)};
 export const MLS_LINK         = ${tsString(campaign.mlsLink)};
+export const QR_CODE_DATA_URL = ${tsString(qrCodeDataUrl)};
 
 export const CLIP_DURATION_SECONDS = ${duration};
 export const PHOTO_TRANSITION = ${tsString(safeTransition)};
+export const VIDEO_STYLE = ${tsString(campaign.videoStyle || 'social-punchy')} as 'social-punchy' | 'luxury-cinematic' | 'brokerage-clean';
+export const MUSIC_MOOD = ${tsString(campaign.musicMood || 'warm-inviting')} as 'warm-inviting' | 'modern-lofi' | 'luxury-cinematic' | 'upbeat-open-house' | 'corporate-professional' | 'urgent-driving' | 'high-energy-social';
 
 
 export const PACING = ${JSON.stringify(safePacing)} as 'fast' | 'balanced' | 'cinematic';
 export const AUTO_ENHANCE = ${campaign.autoEnhance !== false};
-export const SMART_SAFE_ZONES = ${campaign.smartSafeZones !== false};
+export const SMART_SAFE_ZONES = ${(campaign.smartSafeZones ?? campaign.safeZones) !== false};
 export const PERSISTENT_BRANDING = ${campaign.persistentBranding !== false};
 export const PROGRESS_BAR = ${campaign.progressBar !== false};
 
 `;
 
   fs.writeFileSync(configFile, config, 'utf8');
+}
+
+function writePostingPackage(outDir, campaign) {
+  const propertyLabel = [campaign.propertyAddress, campaign.city, campaign.state].filter(Boolean).join(', ');
+  const captionParts = [
+    propertyLabel ? `${propertyLabel}` : 'New listing reel',
+    campaign.shortDescription || '',
+    campaign.listingPrice ? `Offered at ${campaign.listingPrice}.` : '',
+    campaign.ctaText ? campaign.ctaText : 'Message for details.',
+  ].filter(Boolean);
+  const packageData = {
+    propertyLabel,
+    postingTitle: `${campaign.templates?.[0] === 'just-sold' ? 'Just Sold' : campaign.templates?.[0] === 'open-house' ? 'Open House' : 'Just Listed'} | ${propertyLabel || campaign.folder}`,
+    caption: captionParts.join(' '),
+    hashtags: ['#realestate', '#listingvideo', '#realtor', '#homesforsale'],
+    mlsLink: campaign.mlsLink || '',
+  };
+  fs.writeFileSync(path.join(outDir, 'posting-package.json'), JSON.stringify(packageData, null, 2), 'utf8');
 }
 
 function parseProgress(line) {
