@@ -7,8 +7,11 @@ export const LISTING_PHOTOS: string[] = [
   "Photos/023724f62b577165c3613e80d4cc0003.jpg",
   "Photos/09f59ca6d68ca30ecc0bde3c4f4a1891.jpg",
   "Photos/2024-02-23_10.22.06.jpg",
+  "Photos/2024-02-23_10.22.23.jpg",
+  "Photos/2024-02-23_10.27.12.jpg",
   "Photos/2c87582010a90beab87c791b825d6737.jpg",
   "Photos/485_W_Cummington_-_Social-2-2.jpg",
+  "Photos/Drone-3.jpg",
   "Photos/House_06.jpg",
   "Photos/Longview_Drone-Social-17.jpg",
   "Photos/b192047d11522d37a6e261ca6a5a2b69.jpg",
@@ -36,6 +39,18 @@ export const PHOTO_SETTINGS = [
     "focusY": 50
   },
   {
+    "path": "Photos/2024-02-23_10.22.23.jpg",
+    "mode": "show-whole-room",
+    "focusX": 50,
+    "focusY": 50
+  },
+  {
+    "path": "Photos/2024-02-23_10.27.12.jpg",
+    "mode": "show-whole-room",
+    "focusX": 50,
+    "focusY": 50
+  },
+  {
     "path": "Photos/2c87582010a90beab87c791b825d6737.jpg",
     "mode": "show-whole-room",
     "focusX": 50,
@@ -43,6 +58,12 @@ export const PHOTO_SETTINGS = [
   },
   {
     "path": "Photos/485_W_Cummington_-_Social-2-2.jpg",
+    "mode": "show-whole-room",
+    "focusX": 50,
+    "focusY": 50
+  },
+  {
+    "path": "Photos/Drone-3.jpg",
     "mode": "show-whole-room",
     "focusX": 50,
     "focusY": 50
@@ -84,32 +105,32 @@ export const PHOTO_SETTINGS = [
   focusY: number;
 }[];
 
-export const AGENT_HEADSHOT_FILE = "Headshot/headshot.png";
-export const BROKERAGE_LOGO_FILE = "Logo/logo.png";
-export const BACKGROUND_MUSIC_FILE = "Music/music.mp3";
+export const AGENT_HEADSHOT_FILE = "";
+export const BROKERAGE_LOGO_FILE = "";
+export const BACKGROUND_MUSIC_FILE = "";
 
-export const PROPERTY_ADDRESS = "123 Maple Street";
-export const CITY             = "Windsor";
-export const STATE            = "CT";
-export const LISTING_PRICE    = "$500,000";
+export const PROPERTY_ADDRESS = "88 Prospect Hill Drive";
+export const CITY             = "Test City";
+export const STATE            = "MA";
+export const LISTING_PRICE    = "$750,000";
 export const BEDS             = "4";
-export const BATHS            = "2";
-export const SQUARE_FEET      = "2,100";
+export const BATHS            = "3";
+export const SQUARE_FEET      = "2400";
 
 export const AGENT_NAME       = "Jordan Carter";
-export const AGENT_PHONE      = "(860) 555-0142";
-export const AGENT_EMAIL      = "jordan@example.com";
-export const BROKERAGE_NAME   = "Bluestone Realty";
+export const AGENT_PHONE      = "(555) 010-2026";
+export const AGENT_EMAIL      = "agent@example.com";
+export const BROKERAGE_NAME   = "Real Estate Reels";
 export const CTA_TEXT         = "DM TOUR FOR DETAILS";
 
 export const OPEN_HOUSE_DATE  = "";
 export const OPEN_HOUSE_TIME  = "";
-export const SHORT_DESCRIPTION = "A bright move-in ready home with flexible living space.";
-export const NEIGHBORHOOD     = "Windsor Center";
+export const SHORT_DESCRIPTION = "Render smoke test for the updated app flow.";
+export const NEIGHBORHOOD     = "Sample Heights";
 export const MLS_LINK         = "";
 export const QR_CODE_DATA_URL = "";
 
-export const CLIP_DURATION_SECONDS = 19;
+export const CLIP_DURATION_SECONDS = 6;
 export const PHOTO_TRANSITION = "smart-mix";
 export const VIDEO_STYLE = "social-punchy" as 'social-punchy' | 'luxury-cinematic' | 'brokerage-clean';
 export const MUSIC_MOOD = "warm-inviting" as 'warm-inviting' | 'modern-lofi' | 'luxury-cinematic' | 'upbeat-open-house' | 'corporate-professional' | 'urgent-driving' | 'high-energy-social';
@@ -120,3 +141,4 @@ export const AUTO_ENHANCE = true;
 export const SMART_SAFE_ZONES = true;
 export const PERSISTENT_BRANDING = true;
 export const PROGRESS_BAR = true;
+
