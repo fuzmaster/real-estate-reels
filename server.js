@@ -703,7 +703,7 @@ app.get('/api/render/:jobId/stream', (req, res) => {
     return res.end();
   }
   if (job.status === 'error') {
-    res.write(`event: error\ndata: ${JSON.stringify(job.error || 'Unknown error')}\n\n`);
+    res.write(`event: render-error\ndata: ${JSON.stringify(job.error || 'Unknown error')}\n\n`);
     return res.end();
   }
 
@@ -724,7 +724,7 @@ app.get('/api/render/:jobId/stream', (req, res) => {
     res.write(`event: heartbeat\ndata: ${JSON.stringify(ts)}\n\n`);
   };
   const onDone = () => { res.write('event: done\ndata: {}\n\n'); res.end(); };
-  const onError = msg => { res.write(`event: error\ndata: ${JSON.stringify(msg)}\n\n`); res.end(); };
+  const onError = msg => { res.write(`event: render-error\ndata: ${JSON.stringify(msg)}\n\n`); res.end(); };
 
   emitter.on('log', onLog);
   emitter.on('progress', onProgress);

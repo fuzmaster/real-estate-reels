@@ -208,7 +208,7 @@ export default function RenderConsole({
         es.close();
       });
 
-      es.addEventListener('error', (e) => {
+      es.addEventListener('render-error', (e) => {
         const msg = (e as MessageEvent).data ? JSON.parse((e as MessageEvent).data) : 'Unknown error';
         const errText = `ERROR: ${msg}`;
         setJobStates(s => ({
