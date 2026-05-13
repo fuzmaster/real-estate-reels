@@ -44,7 +44,9 @@ RUN npm ci --omit=dev || npm install --omit=dev
 
 # Install client deps and build frontend.
 COPY client/package*.json ./client/
-RUN npm ci --prefix client || npm install --prefix client
+# The client build runs TypeScript/Vite, so devDependencies must be present
+# even though the final container still runs with NODE_ENV=production.
+RUN npm ci --prefix client --include=dev || npm install --prefix client --include=dev
 COPY client ./client
 RUN npm run build --prefix client
 
