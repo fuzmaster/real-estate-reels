@@ -22,6 +22,28 @@ services:
         value: /var/data/outputs
       - key: REMOTION_PROJECT
         value: /app/remotion
+      - key: REMOTION_CONCURRENCY
+        value: "1"
+      - key: REMOTION_TIMEOUT_MS
+        value: "300000"
+      - key: REMOTION_IMAGE_FORMAT
+        value: jpeg
+      - key: REMOTION_JPEG_QUALITY
+        value: "72"
+      - key: REMOTION_X264_PRESET
+        value: veryfast
+      - key: REMOTION_CRF
+        value: "24"
+      - key: REMOTION_AUDIO_BITRATE
+        value: 128k
+      - key: REMOTION_MEDIA_CACHE_BYTES
+        value: "33554432"
+      - key: REMOTION_OFFTHREADVIDEO_CACHE_BYTES
+        value: "16777216"
+      - key: REMOTION_GL
+        value: swangle
+      - key: RENDER_PHOTO_MAX_DIMENSION
+        value: "2160"
       - key: DISABLE_AUTO_OPEN
         value: "1"
       - key: CORS_ORIGIN

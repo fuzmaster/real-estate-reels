@@ -79,6 +79,8 @@ if (ASSETS_ROOT && ASSETS_ROOT === BUNDLED_ASSETS && !fs.existsSync(ASSETS_ROOT)
 
 let configValid = validateConfig();
 
+cleanupStaleStagedProjects();
+
 if (!configValid) {
   console.log('\n⚙️  Setup required — open http://localhost:' + PORT + ' to configure paths.\n');
 } else {
@@ -88,6 +90,20 @@ if (!configValid) {
 function requireConfig(req, res, next) {
   if (!configValid) return res.status(503).json({ error: 'Setup required', setupRequired: true });
   next();
+}
+
+function cleanupStaleStagedProjects() {
+  if (path.resolve(ASSETS_ROOT) === path.resolve(BUNDLED_ASSETS)) return;
+
+  const stagedRoot = path.join(REMOTION_PROJECT, 'public', 'Projects');
+  try {
+    if (fs.existsSync(stagedRoot)) {
+      fs.rmSync(stagedRoot, { recursive: true, force: true });
+    }
+    fs.mkdirSync(stagedRoot, { recursive: true });
+  } catch (e) {
+    console.warn(`Could not clean staged Remotion assets: ${e.message}`);
+  }
 }
 
 // ── HEALTH ────────────────────────────────────────────────────
@@ -181,6 +197,8 @@ const PHOTOS_DIR   = 'Photos';
 const HEADSHOT_DIR = 'Headshot';
 const LOGO_DIR     = 'Logo';
 const MUSIC_DIR    = 'Music';
+const RENDER_CACHE_DIR = '.render-cache';
+const OPTIMIZED_PHOTOS_DIR = `${RENDER_CACHE_DIR}/Photos`;
 
 function safeSegment(value, fallback = 'listing') {
   const cleaned = String(value || '')
@@ -804,6 +822,7 @@ async function runRender(jobId, campaign, emitter) {
   if (!sameDir) {
     setPhase('Preparing assets');
     log(`Staging assets...`);
+    fs.rmSync(destFolder, { recursive: true, force: true });
     await copyDirAsync(srcFolder, destFolder);
     log(`Assets ready.`);
   } else {
@@ -826,10 +845,12 @@ async function runRender(jobId, campaign, emitter) {
     throw new Error('No listing photos found — upload at least one image before rendering.');
   }
 
+  const renderPhotos = await prepareRenderPhotos(destFolder, photos, log);
+
   const qrCodeDataUrl = campaign.mlsLink
     ? await QRCode.toDataURL(String(campaign.mlsLink), { margin: 1, width: 220 })
     : '';
-  writeConfig(campaign, photos, CONFIG_FILE, qrCodeDataUrl);
+  writeConfig(campaign, renderPhotos, CONFIG_FILE, qrCodeDataUrl);
   log(`Wrote campaign.config.ts`);
 
   const slug = safeSegment(campaign.folder).replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -853,12 +874,20 @@ async function runRender(jobId, campaign, emitter) {
   for (const comp of compositions) {
     const friendlyName = `${comp.prefix} - ${campaign.folder}`;
     const outFile = path.join(outDir, `${friendlyName}.mp4`);
-    const timeoutMs = process.env.REMOTION_TIMEOUT_MS || '120000';
+    const timeoutMs = process.env.REMOTION_TIMEOUT_MS || '300000';
     const hostedRender = process.env.NODE_ENV === 'production';
     const renderConcurrency = process.env.REMOTION_CONCURRENCY || (hostedRender ? '1' : '');
     const x264Preset = process.env.REMOTION_X264_PRESET || (hostedRender ? 'veryfast' : '');
     const jpegQuality = process.env.REMOTION_JPEG_QUALITY || (hostedRender ? '72' : '');
     const imageFormat = process.env.REMOTION_IMAGE_FORMAT || (hostedRender ? 'jpeg' : '');
+    const mediaCacheSize = process.env.REMOTION_MEDIA_CACHE_BYTES || (hostedRender ? '33554432' : '');
+    const offthreadVideoCacheSize = process.env.REMOTION_OFFTHREADVIDEO_CACHE_BYTES || (hostedRender ? '16777216' : '');
+    const crf = process.env.REMOTION_CRF || (hostedRender ? '24' : '');
+    const audioBitrate = process.env.REMOTION_AUDIO_BITRATE || (hostedRender ? '128k' : '');
+    const videoBitrate = process.env.REMOTION_VIDEO_BITRATE || '';
+    const scale = process.env.REMOTION_SCALE || '';
+    const glRenderer = process.env.REMOTION_GL || (hostedRender ? 'swangle' : '');
+    const disallowParallelEncoding = process.env.REMOTION_DISALLOW_PARALLEL_ENCODING !== '0' && hostedRender;
     const browserExecutable = process.env.CHROME_PATH || process.env.REMOTION_BROWSER_EXECUTABLE || '';
     const renderArgs = ['remotion', 'render', ENTRY_POINT, comp.id, outFile, '--codec=h264', `--timeout=${timeoutMs}`];
 
@@ -866,10 +895,18 @@ async function runRender(jobId, campaign, emitter) {
     if (x264Preset) renderArgs.push(`--x264-preset=${x264Preset}`);
     if (jpegQuality) renderArgs.push(`--jpeg-quality=${jpegQuality}`);
     if (imageFormat) renderArgs.push(`--image-format=${imageFormat}`);
+    if (mediaCacheSize) renderArgs.push(`--media-cache-size-in-bytes=${mediaCacheSize}`);
+    if (offthreadVideoCacheSize) renderArgs.push(`--offthreadvideo-cache-size-in-bytes=${offthreadVideoCacheSize}`);
+    if (crf) renderArgs.push(`--crf=${crf}`);
+    if (audioBitrate) renderArgs.push(`--audio-bitrate=${audioBitrate}`);
+    if (videoBitrate) renderArgs.push(`--video-bitrate=${videoBitrate}`);
+    if (scale) renderArgs.push(`--scale=${scale}`);
+    if (glRenderer) renderArgs.push(`--gl=${glRenderer}`);
+    if (disallowParallelEncoding) renderArgs.push('--disallow-parallel-encoding');
     if (browserExecutable) renderArgs.push(`--browser-executable=${browserExecutable}`);
 
     log(`\n▶  Rendering: ${friendlyName}`);
-    log(`Render settings: timeout ${timeoutMs}ms${renderConcurrency ? `, concurrency ${renderConcurrency}` : ''}${x264Preset ? `, x264 ${x264Preset}` : ''}${jpegQuality ? `, JPEG quality ${jpegQuality}` : ''}${imageFormat ? `, image format ${imageFormat}` : ''}${browserExecutable ? ', system Chromium enabled' : ''}.`);
+    log(`Render settings: timeout ${timeoutMs}ms${renderConcurrency ? `, concurrency ${renderConcurrency}` : ''}${x264Preset ? `, x264 ${x264Preset}` : ''}${jpegQuality ? `, JPEG quality ${jpegQuality}` : ''}${imageFormat ? `, image format ${imageFormat}` : ''}${crf ? `, CRF ${crf}` : ''}${mediaCacheSize ? `, media cache ${mediaCacheSize} bytes` : ''}${offthreadVideoCacheSize ? `, video cache ${offthreadVideoCacheSize} bytes` : ''}${scale ? `, scale ${scale}` : ''}${glRenderer ? `, GL ${glRenderer}` : ''}${disallowParallelEncoding ? ', serial encoding' : ''}${browserExecutable ? ', system Chromium enabled' : ''}.`);
     setPhase('Bundling render');
 
     await spawnRender(
@@ -904,6 +941,74 @@ async function runRender(jobId, campaign, emitter) {
 
 async function copyDirAsync(src, dest) {
   await fs.promises.cp(src, dest, { recursive: true });
+}
+
+async function prepareRenderPhotos(projectDir, photos, log) {
+  if (process.env.DISABLE_PHOTO_OPTIMIZATION === '1') return photos;
+
+  const sourcePhotoDir = path.join(projectDir, PHOTOS_DIR);
+  const cachePhotoDir = path.join(projectDir, RENDER_CACHE_DIR, PHOTOS_DIR);
+  fs.rmSync(cachePhotoDir, { recursive: true, force: true });
+  fs.mkdirSync(cachePhotoDir, { recursive: true });
+
+  const optimized = [];
+  let optimizedCount = 0;
+
+  for (const rel of photos) {
+    const sourcePath = path.join(projectDir, rel);
+    const parsed = path.parse(rel);
+    const outputName = `${safeFileStem(parsed.name, 'photo')}.jpg`;
+    const outputRel = path.posix.join(OPTIMIZED_PHOTOS_DIR, outputName);
+    const outputPath = path.join(projectDir, RENDER_CACHE_DIR, PHOTOS_DIR, outputName);
+
+    if (!fs.existsSync(sourcePath) || !sourcePath.startsWith(sourcePhotoDir)) {
+      optimized.push(rel);
+      continue;
+    }
+
+    try {
+      await optimizeImageForRender(sourcePath, outputPath);
+      optimized.push(outputRel);
+      optimizedCount += 1;
+    } catch (e) {
+      log(`Warning: could not optimize ${rel}; using original (${e.message}).`);
+      optimized.push(rel);
+    }
+  }
+
+  if (optimizedCount > 0) {
+    log(`Optimized ${optimizedCount} listing photo(s) for lower-memory rendering.`);
+  }
+
+  return optimized;
+}
+
+function optimizeImageForRender(inputPath, outputPath) {
+  return new Promise((resolve, reject) => {
+    const maxDimension = process.env.RENDER_PHOTO_MAX_DIMENSION || '2160';
+    const quality = process.env.RENDER_PHOTO_JPEG_QUALITY || '4';
+    const args = [
+      '-y',
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-i',
+      inputPath,
+      '-vf',
+      `scale='if(gt(iw,ih),min(${maxDimension},iw),-2)':'if(gt(iw,ih),-2,min(${maxDimension},ih))'`,
+      '-q:v',
+      quality,
+      outputPath,
+    ];
+    const proc = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    let stderr = '';
+    proc.stderr.on('data', chunk => { stderr += chunk.toString(); });
+    proc.on('close', code => {
+      if (code === 0 && fs.existsSync(outputPath)) resolve();
+      else reject(new Error(stderr.trim() || `ffmpeg exited with code ${code}`));
+    });
+    proc.on('error', reject);
+  });
 }
 
 function tsString(value) {
@@ -947,8 +1052,8 @@ const submittedPhotoSettings = Array.isArray(campaign.photoSettings)
 const cleanPhotoSettings = submittedPhotoSettings.length > 0
     ? submittedPhotoSettings
         .filter(s => s && s.path)
-        .map(s => ({
-          path: String(s.path),
+        .map((s, index) => ({
+          path: photos[index] || String(s.path),
           mode: s.mode === 'fill' ? 'fill' : 'show-whole-room',
           focusX: Number.isFinite(Number(s.focusX)) ? Math.min(100, Math.max(0, Number(s.focusX))) : 50,
           focusY: Number.isFinite(Number(s.focusY)) ? Math.min(100, Math.max(0, Number(s.focusY))) : 50,
