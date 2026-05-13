@@ -234,6 +234,8 @@ export default function CampaignForm({
   const hardWarnings = readinessChecks.filter(check =>
     check.label === 'Open House videos have date and time.' || check.label === 'MLS link is valid for QR generation.'
   ).filter(check => !check.ok);
+  const readyCount = readinessChecks.filter(check => check.ok).length;
+  const readinessScore = Math.round((readyCount / readinessChecks.length) * 100);
   const storyboardPhotos = photos.slice(0, 4);
   const googleMapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY?.trim();
   useEffect(() => {
@@ -589,10 +591,38 @@ export default function CampaignForm({
 
   return (
     <form id="campaign-form" onSubmit={handleSubmit}>
-      <div className="space-y-5">
-        <div>
-          <h1 className="text-2xl font-bold text-white mb-1">New Listing Reel</h1>
-          <p className="text-neutral-400 text-sm">Upload photos, frame each shot, choose a vibe, then render.</p>
+      <div className="space-y-6">
+        <div className="studio-hero border border-neutral-800 bg-neutral-900/80 p-5 md:p-6">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-end">
+            <div>
+              <div className="text-[11px] uppercase tracking-widest text-emerald-300/80">Build Workspace</div>
+              <h1 className="text-3xl font-bold text-white mt-2">New Listing Reel</h1>
+              <p className="text-neutral-400 text-sm leading-relaxed mt-2 max-w-2xl">
+                Shape the listing, preview the story, and move into rendering with a cleaner production checklist.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <span className="studio-pill">{activeName || 'No project selected'}</span>
+                <span className="studio-pill">{photos.length} photo{photos.length === 1 ? '' : 's'}</span>
+                <span className="studio-pill">{templates.length} template{templates.length === 1 ? '' : 's'}</span>
+                <span className="studio-pill">{effectiveDuration}s reel</span>
+              </div>
+            </div>
+            <div className="border border-neutral-800 bg-neutral-950/80 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[11px] uppercase tracking-widest text-neutral-500">Render Readiness</div>
+                  <div className="text-3xl font-black text-white mt-1">{readinessScore}%</div>
+                </div>
+                <div className={`status-orb ${hardWarnings.length === 0 ? 'status-orb-ready' : 'status-orb-warn'}`} />
+              </div>
+              <div className="mt-4 h-2 bg-neutral-900 border border-neutral-800 overflow-hidden">
+                <div className="h-full readiness-meter" style={{ width: `${readinessScore}%` }} />
+              </div>
+              <p className="text-xs text-neutral-500 mt-3 leading-relaxed">
+                {hardWarnings.length === 0 ? 'No blocking issues detected. You can render when ready.' : `${hardWarnings.length} blocking item${hardWarnings.length === 1 ? '' : 's'} still need attention.`}
+              </p>
+            </div>
+          </div>
         </div>
 
         {error && <div className="bg-red-950/50 border border-red-800 text-red-300 px-4 py-3 rounded-none text-sm">{error}</div>}
@@ -947,8 +977,8 @@ export default function CampaignForm({
           </div>
         </Card>
 
-        <div className="flex flex-wrap items-center gap-3 pb-10">
-          <button type="submit" disabled={submitting} className="bg-white hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold px-8 py-3 rounded-none transition-colors text-sm tracking-wide">{submitting ? 'Starting…' : 'RENDER NOW'}</button>
+        <div className="sticky-render-bar flex flex-wrap items-center gap-3 pb-10">
+          <button type="submit" disabled={submitting} className="primary-render-btn bg-white hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold px-8 py-3 rounded-none transition-colors text-sm tracking-wide">{submitting ? 'Starting…' : 'RENDER NOW'}</button>
           <button type="button" onClick={handleAddToQueue} className="bg-neutral-800 hover:bg-neutral-700 text-white font-medium px-6 py-3 rounded-none transition-colors text-sm border border-neutral-700">{queuedFeedback ? '✓ Added to Queue' : '+ Add to Queue'}</button>
           <span className="text-xs text-neutral-500">{templates.length} output{templates.length !== 1 ? 's' : ''}</span>
         </div>
@@ -1222,7 +1252,7 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
 }
 
 function Card({ title, help, action, children }: { title: string; help?: string; action?: React.ReactNode; children: React.ReactNode }) {
-  return <section className="bg-neutral-900 border border-neutral-800 rounded-none p-5"><div className="flex items-start justify-between gap-4 mb-4"><div><h2 className="text-white font-semibold">{title}</h2>{help && <p className="text-xs text-neutral-500 mt-1 leading-relaxed">{help}</p>}</div>{action}</div>{children}</section>;
+  return <section className="studio-card bg-neutral-900 border border-neutral-800 rounded-none p-5 md:p-6"><div className="flex items-start justify-between gap-4 mb-5"><div><h2 className="text-white font-semibold text-lg">{title}</h2>{help && <p className="text-xs text-neutral-500 mt-1 leading-relaxed max-w-3xl">{help}</p>}</div>{action}</div>{children}</section>;
 }
 
 function Label({ text, full, children }: { text: string; full?: boolean; children: React.ReactNode }) {

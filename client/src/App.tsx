@@ -99,14 +99,22 @@ export default function App() {
   return (
     <div className="rer-app-ui min-h-screen flex flex-col">
       {/* Top nav */}
-      <header className="border-b border-neutral-800 bg-neutral-900/80 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+      <header className="app-shell-header sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between gap-6">
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold tracking-tight text-white">REAL ESTATE</span>
-            <span className="text-lg font-bold tracking-tight text-neutral-400">REELS</span>
+            <div className="mr-3 h-10 w-10 border border-white/10 bg-white/[0.03] flex items-center justify-center">
+              <div className="h-4 w-4 border border-emerald-300/70 bg-emerald-300/10" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-bold tracking-tight text-white">REAL ESTATE</span>
+                <span className="text-lg font-bold tracking-tight text-neutral-400">REELS</span>
+              </div>
+              <p className="text-xs text-neutral-500 mt-0.5">Listing video studio</p>
+            </div>
             <span
               title={serverOk === null ? 'Checking server…' : serverOk ? 'Server online' : 'Server offline'}
-              className={`w-2 h-2 rounded-sm ml-1 flex-shrink-0 transition-colors
+              className={`w-2 h-2 rounded-sm ml-2 flex-shrink-0 transition-colors
                 ${serverOk === null ? 'bg-neutral-600'
                   : serverOk ? 'bg-emerald-400'
                   : 'bg-red-500 animate-pulse'}`}
@@ -144,15 +152,10 @@ export default function App() {
             </NavBtn>
           </nav>
         </div>
-        <div className="max-w-6xl mx-auto px-6 pb-3 -mt-1">
-          <p className="text-xs text-neutral-500">
-            Turn listing photos into branded real estate videos in minutes.
-          </p>
-        </div>
       </header>
 
       {/* Main content */}
-      <main className="flex-1 max-w-4xl mx-auto w-full px-6 py-8">
+      <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-8">
         {serverOk === false && (
           <div className="mb-6 bg-yellow-950/60 border border-yellow-800/60 rounded-none px-5 py-4 flex gap-4 items-start">
             <span className="text-yellow-400 text-xl flex-shrink-0 mt-0.5">⚠</span>
