@@ -854,15 +854,22 @@ async function runRender(jobId, campaign, emitter) {
     const friendlyName = `${comp.prefix} - ${campaign.folder}`;
     const outFile = path.join(outDir, `${friendlyName}.mp4`);
     const timeoutMs = process.env.REMOTION_TIMEOUT_MS || '120000';
-    const renderConcurrency = process.env.REMOTION_CONCURRENCY || (process.env.NODE_ENV === 'production' ? '2' : '');
+    const hostedRender = process.env.NODE_ENV === 'production';
+    const renderConcurrency = process.env.REMOTION_CONCURRENCY || (hostedRender ? '1' : '');
+    const x264Preset = process.env.REMOTION_X264_PRESET || (hostedRender ? 'veryfast' : '');
+    const jpegQuality = process.env.REMOTION_JPEG_QUALITY || (hostedRender ? '72' : '');
+    const imageFormat = process.env.REMOTION_IMAGE_FORMAT || (hostedRender ? 'jpeg' : '');
     const browserExecutable = process.env.CHROME_PATH || process.env.REMOTION_BROWSER_EXECUTABLE || '';
     const renderArgs = ['remotion', 'render', ENTRY_POINT, comp.id, outFile, '--codec=h264', `--timeout=${timeoutMs}`];
 
     if (renderConcurrency) renderArgs.push(`--concurrency=${renderConcurrency}`);
+    if (x264Preset) renderArgs.push(`--x264-preset=${x264Preset}`);
+    if (jpegQuality) renderArgs.push(`--jpeg-quality=${jpegQuality}`);
+    if (imageFormat) renderArgs.push(`--image-format=${imageFormat}`);
     if (browserExecutable) renderArgs.push(`--browser-executable=${browserExecutable}`);
 
     log(`\n▶  Rendering: ${friendlyName}`);
-    log(`Render settings: timeout ${timeoutMs}ms${renderConcurrency ? `, concurrency ${renderConcurrency}` : ''}${browserExecutable ? ', system Chromium enabled' : ''}.`);
+    log(`Render settings: timeout ${timeoutMs}ms${renderConcurrency ? `, concurrency ${renderConcurrency}` : ''}${x264Preset ? `, x264 ${x264Preset}` : ''}${jpegQuality ? `, JPEG quality ${jpegQuality}` : ''}${imageFormat ? `, image format ${imageFormat}` : ''}${browserExecutable ? ', system Chromium enabled' : ''}.`);
     setPhase('Bundling render');
 
     await spawnRender(

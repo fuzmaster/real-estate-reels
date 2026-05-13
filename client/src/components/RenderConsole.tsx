@@ -226,7 +226,18 @@ export default function RenderConsole({
       es.onerror = () => {
         setJobStates(s => {
           if (s[jobId]?.status === 'done' || s[jobId]?.status === 'error') return s;
-          return { ...s, [jobId]: { ...(s[jobId] ?? { logs: [], progress: null }), status: 'error' } };
+          const previous = s[jobId] ?? { logs: [], progress: null, startedAt: null, etaMs: null };
+          const disconnectText = 'ERROR: Render server disconnected before completion. This often means the cloud worker restarted or ran out of memory. Please retry after the service is back online.';
+          return {
+            ...s,
+            [jobId]: {
+              ...previous,
+              logs: [...(previous.logs ?? []), { text: disconnectText, color: 'text-red-400' }],
+              status: 'error',
+              phase: 'Server disconnected',
+              lastActivityAt: Date.now(),
+            },
+          };
         });
         es.close();
       };
