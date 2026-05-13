@@ -22,6 +22,8 @@ interface JobState {
   progress: number | null; // 0–100, null = unknown
   startedAt: number | null; // Date.now() when render started
   etaMs: number | null;     // estimated ms remaining
+  phase?: string;
+  lastActivityAt?: number | null;
 }
 
 function formatElapsed(ms: number): string {
@@ -54,6 +56,19 @@ function statusBadge(status: Status) {
       {label}
     </span>
   );
+}
+
+function progressLabel(state?: JobState): string {
+  if (!state) return 'Waiting for renderer';
+  if (state.status === 'done') return 'Complete';
+  if (state.status === 'error') return 'Failed';
+  if (state.phase) return state.phase;
+  return state.progress != null ? 'Rendering frames' : 'Connecting to renderer';
+}
+
+function isTakingLongerThanUsual(state?: JobState): boolean {
+  if (!state || state.status !== 'running' || !state.lastActivityAt) return false;
+  return Date.now() - state.lastActivityAt > 45_000;
 }
 
 // Ask for notification permission once — silently if already granted/denied
@@ -123,7 +138,7 @@ export default function RenderConsole({
 
       setJobStates(s => ({
         ...s,
-        [jobId]: s[jobId] ?? { status: 'connecting', logs: [], progress: null, startedAt: null },
+        [jobId]: s[jobId] ?? { status: 'connecting', logs: [], progress: null, startedAt: null, etaMs: null, phase: 'Queued', lastActivityAt: null },
       }));
 
       const es = new EventSource(`${API_BASE}/api/render/${jobId}/stream`);
@@ -133,7 +148,7 @@ export default function RenderConsole({
         const text = JSON.parse(e.data) as string;
         const line: LogLine = { text, color: colorLine(text) };
         setJobStates(s => {
-          const prev = s[jobId] ?? { logs: [], progress: null, startedAt: null };
+          const prev = s[jobId] ?? { logs: [], progress: null, startedAt: null, etaMs: null, lastActivityAt: null };
           return {
             ...s,
             [jobId]: {
@@ -141,6 +156,7 @@ export default function RenderConsole({
               status: 'running',
               startedAt: prev.startedAt ?? Date.now(),
               logs: [...prev.logs, line],
+              lastActivityAt: Date.now(),
             },
           };
         });
@@ -155,12 +171,37 @@ export default function RenderConsole({
             const elapsed = Date.now() - prev.startedAt;
             etaMs = Math.round((elapsed / pct) * (100 - pct));
           }
-          return { ...s, [jobId]: { ...(prev ?? { logs: [], progress: null, startedAt: null, etaMs: null }), progress: pct, etaMs } };
+          return { ...s, [jobId]: { ...(prev ?? { logs: [], progress: null, startedAt: null, etaMs: null, lastActivityAt: null }), progress: pct, etaMs, lastActivityAt: Date.now() } };
         });
       });
 
+      es.addEventListener('phase', (e) => {
+        const phase = JSON.parse((e as MessageEvent).data) as string;
+        setJobStates(s => ({
+          ...s,
+          [jobId]: {
+            ...(s[jobId] ?? { logs: [], progress: null, startedAt: null, etaMs: null, lastActivityAt: null }),
+            status: s[jobId]?.status === 'connecting' ? 'running' : (s[jobId]?.status ?? 'running'),
+            startedAt: s[jobId]?.startedAt ?? Date.now(),
+            phase,
+            lastActivityAt: Date.now(),
+          },
+        }));
+      });
+
+      es.addEventListener('heartbeat', (e) => {
+        const ts = JSON.parse((e as MessageEvent).data) as number;
+        setJobStates(s => ({
+          ...s,
+          [jobId]: {
+            ...(s[jobId] ?? { logs: [], progress: null, startedAt: null, etaMs: null }),
+            lastActivityAt: ts,
+          },
+        }));
+      });
+
       es.addEventListener('done', () => {
-        setJobStates(s => ({ ...s, [jobId]: { ...(s[jobId] ?? { logs: [], progress: null, startedAt: null, etaMs: null }), status: 'done', progress: 100 } }));
+        setJobStates(s => ({ ...s, [jobId]: { ...(s[jobId] ?? { logs: [], progress: null, startedAt: null, etaMs: null }), status: 'done', progress: 100, phase: 'Complete', lastActivityAt: Date.now() } }));
         sendNotification(label);
         playChime();
         onJobDone?.();
@@ -176,6 +217,7 @@ export default function RenderConsole({
             ...(s[jobId] ?? { logs: [], progress: null }),
             logs: [...(s[jobId]?.logs ?? []), { text: errText, color: 'text-red-400' }],
             status: 'error',
+            phase: 'Failed',
           },
         }));
         es.close();
@@ -281,8 +323,14 @@ export default function RenderConsole({
                     </span>
                   )}
                 </div>
+                {status === 'running' && (
+                  <p className="text-xs text-neutral-400 mt-1">{progressLabel(state)}</p>
+                )}
                 {status === 'running' && state?.etaMs != null && state.etaMs > 0 && (
                   <p className="text-xs text-neutral-600 mt-0.5">{formatEta(state.etaMs)}</p>
+                )}
+                {status === 'running' && isTakingLongerThanUsual(state) && (
+                  <p className="text-xs text-amber-300/80 mt-1">Taking longer than usual, but still connected.</p>
                 )}
                 {status === 'running' && (
                   <button
@@ -329,7 +377,8 @@ export default function RenderConsole({
               {selected?.status === 'running' && (
                 <span className="ml-auto text-xs text-blue-400 font-mono flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-                  {selected.progress != null ? `${selected.progress}%` : 'rendering…'}
+                  {progressLabel(selected)}
+                  {selected.progress != null ? ` · ${selected.progress}%` : ''}
                   {selected.etaMs != null && selected.etaMs > 0 && (
                     <span className="text-neutral-600 ml-1">{formatEta(selected.etaMs)}</span>
                   )}
@@ -366,6 +415,11 @@ export default function RenderConsole({
                 {line.text || <br />}
               </div>
             ))}
+            {selected?.status === 'running' && isTakingLongerThanUsual(selected) && (
+              <div className="mt-3 border border-amber-800/70 bg-amber-950/30 px-3 py-2 text-amber-200">
+                This render is taking longer than usual. The worker is still connected, so it may be encoding or finalizing output.
+              </div>
+            )}
             {selected?.status === 'done' && (
               <div className="mt-3 text-spotify-green font-medium">
                 ✅ Render complete — switch to Output Gallery to download.

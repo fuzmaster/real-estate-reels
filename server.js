@@ -620,6 +620,8 @@ app.post('/api/render', requireConfig, (req, res) => {
     campaign: campaign.folder,
     startTime: Date.now(),
     logs: [],
+    phase: 'Queued',
+    lastActivityAt: Date.now(),
   });
 
   res.json({ jobId });
@@ -671,6 +673,12 @@ app.get('/api/render/:jobId/stream', (req, res) => {
   if (job.progress != null) {
     res.write(`event: progress\ndata: ${JSON.stringify(job.progress)}\n\n`);
   }
+  if (job.phase) {
+    res.write(`event: phase\ndata: ${JSON.stringify(job.phase)}\n\n`);
+  }
+  if (job.lastActivityAt) {
+    res.write(`event: heartbeat\ndata: ${JSON.stringify(job.lastActivityAt)}\n\n`);
+  }
 
   if (job.status === 'done') {
     res.write('event: done\ndata: {}\n\n');
@@ -689,17 +697,29 @@ app.get('/api/render/:jobId/stream', (req, res) => {
     job.progress = pct;
     res.write(`event: progress\ndata: ${JSON.stringify(pct)}\n\n`);
   };
+  const onPhase = phase => {
+    job.phase = phase;
+    res.write(`event: phase\ndata: ${JSON.stringify(phase)}\n\n`);
+  };
+  const onHeartbeat = ts => {
+    job.lastActivityAt = ts;
+    res.write(`event: heartbeat\ndata: ${JSON.stringify(ts)}\n\n`);
+  };
   const onDone = () => { res.write('event: done\ndata: {}\n\n'); res.end(); };
   const onError = msg => { res.write(`event: error\ndata: ${JSON.stringify(msg)}\n\n`); res.end(); };
 
   emitter.on('log', onLog);
   emitter.on('progress', onProgress);
+  emitter.on('phase', onPhase);
+  emitter.on('heartbeat', onHeartbeat);
   emitter.on('done', onDone);
   emitter.on('error', onError);
 
   req.on('close', () => {
     emitter.off('log', onLog);
     emitter.off('progress', onProgress);
+    emitter.off('phase', onPhase);
+    emitter.off('heartbeat', onHeartbeat);
     emitter.off('done', onDone);
     emitter.off('error', onError);
   });
@@ -759,12 +779,18 @@ const TEMPLATE_TO_COMP = {
 // ── RENDER LOGIC ──────────────────────────────────────────────
 async function runRender(jobId, campaign, emitter) {
   const log = msg => emitter.emit('log', msg);
+  const setPhase = phase => {
+    const job = jobs.get(jobId);
+    if (job) job.phase = phase;
+    emitter.emit('phase', phase);
+  };
 
   const CONFIG_FILE = path.join(REMOTION_PROJECT, 'src', 'campaign.config.ts');
   const ENTRY_POINT = 'src/index.tsx';
   const OUTPUT_BASE = OUTPUT_ROOT;
 
   log(`━━━ Starting render: ${campaign.folder} ━━━`);
+  setPhase('Preparing listing');
 
   campaign.folder = safeSegment(campaign.folder);
   const srcFolder = path.join(ASSETS_ROOT, 'Projects', campaign.folder);
@@ -776,6 +802,7 @@ async function runRender(jobId, campaign, emitter) {
 
   const sameDir = path.resolve(srcFolder) === path.resolve(destFolder);
   if (!sameDir) {
+    setPhase('Preparing assets');
     log(`Staging assets...`);
     await copyDirAsync(srcFolder, destFolder);
     log(`Assets ready.`);
@@ -836,6 +863,7 @@ async function runRender(jobId, campaign, emitter) {
 
     log(`\n▶  Rendering: ${friendlyName}`);
     log(`Render settings: timeout ${timeoutMs}ms${renderConcurrency ? `, concurrency ${renderConcurrency}` : ''}${browserExecutable ? ', system Chromium enabled' : ''}.`);
+    setPhase('Bundling render');
 
     await spawnRender(
       'npx',
@@ -843,9 +871,11 @@ async function runRender(jobId, campaign, emitter) {
       REMOTION_PROJECT,
       log,
       emitter,
-      jobId
+      jobId,
+      setPhase
     );
 
+    setPhase('Finalizing output');
     log(`✅  Done: ${friendlyName}.mp4`);
   }
 
@@ -862,6 +892,7 @@ async function runRender(jobId, campaign, emitter) {
   }
 
   log(`\n━━━ All ${compositions.length} render(s) complete! ━━━`);
+  setPhase('Complete');
 }
 
 async function copyDirAsync(src, dest) {
@@ -1036,16 +1067,45 @@ function parseProgress(line) {
   return null;
 }
 
-function spawnRender(cmd, args, cwd, log, emitter, jobId) {
+function inferPhase(line, currentPhase) {
+  if (/Bundling/i.test(line)) return 'Bundling render';
+  if (/Copying public dir|Getting composition|Composition /i.test(line)) return 'Preparing render';
+  if (/Rendered\s+\d+\s*\/\s*\d+/i.test(line)) return 'Rendering frames';
+  if (/Encoded|Muxing|audio|video/i.test(line) && currentPhase === 'Rendering frames') return 'Encoding video';
+  return currentPhase;
+}
+
+function spawnRender(cmd, args, cwd, log, emitter, jobId, setPhase) {
   return new Promise((resolve, reject) => {
     if (cancelledJobs.has(jobId)) return reject(new Error('Render cancelled'));
 
     const safeArgs = args.map(a => a.includes(' ') ? `"${a}"` : a);
     const proc = spawn(cmd, safeArgs, { cwd, shell: true, env: { ...process.env } });
     activeProcesses.set(jobId, proc);
+    let currentPhase = 'Bundling render';
+    let lastOutputAt = Date.now();
+    const heartbeat = setInterval(() => {
+      const now = Date.now();
+      emitter.emit('heartbeat', now);
+      if (now - lastOutputAt >= 45_000) {
+        if (currentPhase === 'Rendering frames') {
+          currentPhase = 'Encoding video';
+          setPhase(currentPhase);
+        }
+        log(`Still working — ${currentPhase.toLowerCase()} continues without new console output.`);
+        lastOutputAt = now;
+      }
+    }, 15_000);
 
     const handleData = data => {
       data.toString().split('\n').filter(Boolean).forEach(line => {
+        lastOutputAt = Date.now();
+        emitter.emit('heartbeat', lastOutputAt);
+        const nextPhase = inferPhase(line, currentPhase);
+        if (nextPhase !== currentPhase) {
+          currentPhase = nextPhase;
+          setPhase(currentPhase);
+        }
         log(line);
         const pct = parseProgress(line);
         if (pct != null) emitter.emit('progress', pct);
@@ -1055,12 +1115,13 @@ function spawnRender(cmd, args, cwd, log, emitter, jobId) {
     proc.stderr.on('data', handleData);
 
     proc.on('close', code => {
+      clearInterval(heartbeat);
       activeProcesses.delete(jobId);
       if (cancelledJobs.has(jobId)) reject(new Error('Render cancelled'));
       else if (code === 0) resolve();
       else reject(new Error(`Render process exited with code ${code}`));
     });
-    proc.on('error', err => { activeProcesses.delete(jobId); reject(err); });
+    proc.on('error', err => { clearInterval(heartbeat); activeProcesses.delete(jobId); reject(err); });
   });
 }
 
